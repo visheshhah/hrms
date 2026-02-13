@@ -2,13 +2,16 @@ package com.example.hrms.entities;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
-@Data
-@NoArgsConstructor
+@Getter
+@Setter
 public class Employee {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,11 +33,17 @@ public class Employee {
     private double salary;
     private String designation;
 
-    @OneToOne
-    @JoinColumn(name = "user_id")
+    @OneToOne(mappedBy = "employee")
     private User user;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @ManyToOne
+    @JoinColumn(name = "manager_id")
+    private Employee manager;
+
+    @OneToMany(mappedBy = "manager")
+    private List<Employee> employees;
+
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "department_id")
     private Department department;
 }
