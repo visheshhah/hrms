@@ -2,15 +2,12 @@ package com.example.hrms.entities;
 
 import com.example.hrms.enums.ERole;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "roles")
-@Data
-@NoArgsConstructor
-@RequiredArgsConstructor
+@Getter
+@Setter
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
