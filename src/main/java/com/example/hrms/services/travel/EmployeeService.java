@@ -23,8 +23,16 @@ public class EmployeeService {
         List<Employee> employees = employeeRepository.findAll();
         return employees
                 .stream()
-                .map(employee -> modelMapper.map(employee, EmployeeDto.class))
-                .collect(Collectors.toList());
+                .map(employee -> {
+                    EmployeeDto employeeDto = new EmployeeDto();
+                    employeeDto.setId(employee.getId());
+                    employeeDto.setFirstName(employee.getFirstName());
+                    employeeDto.setLastName(employee.getLastName());
+                    employeeDto.setDesignation(employee.getDesignation());
+                    employeeDto.setDepartment(employee.getDepartment().getDepartmentName());
+                    return employeeDto;
+                })
+                .toList();
     }
 
     public EmployeeDto getEmployeeById(Long id) {
@@ -53,6 +61,7 @@ public class EmployeeService {
             chain.add(current);
             current = current.getManager();
         }
+
 
         return chain
                 .stream()

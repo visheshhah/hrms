@@ -1,17 +1,15 @@
 package com.example.hrms.entities;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Data
-@RequiredArgsConstructor
-@NoArgsConstructor
-@Table(name = "expense_proofs")
+@Getter
+@Setter
+@Table(name = "expense_proof")
 public class ExpenseProof {
 
     @Id
@@ -19,14 +17,16 @@ public class ExpenseProof {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "expense_id")
+    @JoinColumn(name = "expense_id",  nullable = false)
     private Expense expense;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "document_type_id")
+    @JoinColumn(name = "document_type_id", nullable = false)
     private DocumentType documentType;
 
-    private String fileType;
+    private String fileName;
+
+    private String filePath;
 
     @Column(nullable = false)
     private Instant uploadedAt =  Instant.now();

@@ -78,7 +78,7 @@ public class AuthService {
 
     public String login(LoginDto loginDTO) {
         // try{
-        User user = userRepository.findByUsername(loginDTO.getUsername()).orElseThrow();
+        //User user = userRepository.findByUsername(loginDTO.getUsername()).orElseThrow();
         //System.out.println("Db password" + user.getPassword());
         //boolean matches = passwordEncoder.matches(loginDTO.getPassword(), user.getPassword());
         //System.out.println("Matches " + matches);

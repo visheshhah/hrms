@@ -2,22 +2,16 @@ package com.example.hrms.entities;
 
 import com.example.hrms.enums.TravelStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
-import java.security.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Entity
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@RequiredArgsConstructor
+@Getter
+@Setter
+@Table(name = "travel_plan")
 public class TravelPlan extends BaseClass{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,7 +37,9 @@ public class TravelPlan extends BaseClass{
     private String destinationLocation;
 
     @Column(nullable = false)
-    private boolean isInternational;
+    private Boolean isInternational;
+
+    private Boolean isActive = Boolean.TRUE;
 
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "created_by_employee_id", nullable = false)

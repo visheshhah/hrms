@@ -2,13 +2,19 @@ package com.example.hrms.entities;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.Instant;
 
 @Entity
-@Data
-@Table(name = "employee_travels")
-public class EmployeeTravel {
+@Getter
+@Setter
+@Table(name = "employee_travels",
+uniqueConstraints = @UniqueConstraint(
+        columnNames = {"travel_plan_id", "employee_id"}
+))
+public class EmployeeTravel extends BaseClass {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
