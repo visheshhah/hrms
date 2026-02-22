@@ -9,4 +9,5 @@ public class EmployeeDto {
     private String lastName;
     private String designation;
     private String department;
+    private Long managerId;
 }

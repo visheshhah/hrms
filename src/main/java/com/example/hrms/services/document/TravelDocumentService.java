@@ -1,6 +1,9 @@
 package com.example.hrms.services.document;
 
+import com.example.hrms.dtos.document.TravelDocumentResponseDto;
 import com.example.hrms.dtos.document.UploadTravelDocumentRequestDto;
+import com.example.hrms.dtos.expense.EmployeeExpenseResponseDto;
+import com.example.hrms.dtos.file.FileResponseDto;
 import com.example.hrms.entities.*;
 import com.example.hrms.enums.EOwnerType;
 import com.example.hrms.enums.ERole;
@@ -8,12 +11,18 @@ import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
 import com.example.hrms.services.files.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -101,5 +110,77 @@ public class TravelDocumentService {
         if(file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Provided file is empty");
         }
+    }
+
+    public List<TravelDocumentResponseDto> findAllDocuments(Long userId, Long travelPlanId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+        Employee employee = user.getEmployee();
+
+        List<TravelDocument> travelDocuments = travelDocumentRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
+
+        return travelDocuments.stream()
+                .map(travelDocument -> {
+                    TravelDocumentResponseDto  travelDocumentResponseDto = new TravelDocumentResponseDto();
+                    travelDocumentResponseDto.setTravelDocumentId(travelDocument.getId());
+                    travelDocumentResponseDto.setTravelPlanId(travelPlanId);
+                    travelDocumentResponseDto.setEmployeeId(employee.getId());
+                    travelDocumentResponseDto.setDocumentTypeName(travelDocument.getDocumentType().getName());
+                    travelDocumentResponseDto.setFileName(travelDocument.getFileName());
+                    travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
+                    travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
+
+                    return  travelDocumentResponseDto;
+                })
+                .toList();
+
+
+
+    }
+
+    public FileResponseDto getDocumentFile(Long travelDocumentId) throws IOException {
+        TravelDocument travelDocument= travelDocumentRepository.findById(travelDocumentId).orElseThrow(() -> new ResourceNotFoundException("NO DOCUMENT FOUND"));
+
+        Resource resource = fileStorageService
+                .load("travel-documents", travelDocument.getFilePath());
+
+        Path path = Paths.get("uploads/private/travel-documents",
+                travelDocument.getFilePath());
+
+        String detectedType = Files.probeContentType(path);
+
+        String contentType = (detectedType != null)
+                ? detectedType
+                : "application/octet-stream";
+
+        return new FileResponseDto(
+                resource,
+                travelDocument.getFileName(),
+                contentType
+        );
+
+    }
+
+    public List<TravelDocumentResponseDto> findAllDocumentsByEmployeeId(Long employeeId, Long travelPlanId) {
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("NO EMPLOYEE FOUND"));
+
+        List<TravelDocument> travelDocuments = travelDocumentRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
+
+        return travelDocuments.stream()
+                .map(travelDocument -> {
+                    TravelDocumentResponseDto  travelDocumentResponseDto = new TravelDocumentResponseDto();
+                    travelDocumentResponseDto.setTravelDocumentId(travelDocument.getId());
+                    travelDocumentResponseDto.setTravelPlanId(travelPlanId);
+                    travelDocumentResponseDto.setEmployeeId(employee.getId());
+                    travelDocumentResponseDto.setDocumentTypeName(travelDocument.getDocumentType().getName());
+                    travelDocumentResponseDto.setFileName(travelDocument.getFileName());
+                    travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
+                    travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
+
+                    return  travelDocumentResponseDto;
+                })
+                .toList();
+
+
+
     }
 }

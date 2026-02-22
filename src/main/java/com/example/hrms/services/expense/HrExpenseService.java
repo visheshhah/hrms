@@ -1,5 +1,7 @@
 package com.example.hrms.services.expense;
 
+import com.example.hrms.dtos.expense.EmployeeExpenseResponseDto;
+import com.example.hrms.dtos.expense.ExpenseProofDto;
 import com.example.hrms.dtos.expense.HrDecisionDto;
 import com.example.hrms.dtos.expense.HrDecisionResponseDto;
 import com.example.hrms.entities.Employee;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,8 +28,7 @@ public class HrExpenseService {
     private final ExpenseRepository expenseRepository;
     private final ModelMapper modelMapper;
     private final UserRepository userRepository;
-
-    //TODO Get filled expense method
+    private final EmployeeRepository employeeRepository;
 
 //    public HrDecisionResponseDto makeDecision(HrDecisionDto hrDecisionDto, Long hrId, String decision ) {
 //        Expense expense = expenseRepository.findById(hrDecisionDto.getExpenseId()).orElseThrow(() ->  new ResourceNotFoundException("EXPENSE NOT FOUND"));
@@ -88,5 +90,44 @@ public class HrExpenseService {
         return modelMapper.map(savedExpense, HrDecisionResponseDto.class);
     }
 
+    public List<EmployeeExpenseResponseDto> findAllExpenses(Long employeeId, Long travelPlanId) {
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() ->  new ResourceNotFoundException("Employee not found"));
+        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
 
+        return expenses.stream()
+                .map(this::mapToDto)
+                .toList();
+    }
+
+    private EmployeeExpenseResponseDto mapToDto(Expense expense) {
+
+        EmployeeExpenseResponseDto dto = new EmployeeExpenseResponseDto();
+
+        dto.setId(expense.getId());
+        dto.setTravelPlanId(expense.getTravelPlan().getId());
+        dto.setRemark(expense.getRemark());
+        dto.setCategoryName(expense.getCategory().getName());
+        dto.setExpenseStatus(expense.getStatus());
+        dto.setAmount(expense.getAmount());
+        dto.setDescription(expense.getDescription());
+
+        List<ExpenseProofDto> proofDtos = expense.getProofs()
+                .stream()
+                .map(proof -> {
+                    ExpenseProofDto p = new ExpenseProofDto();
+                    p.setId(proof.getId());
+                    p.setFileName(proof.getFileName());
+                    return p;
+                })
+                .toList();
+
+        dto.setProofs(proofDtos);
+
+        return dto;
+    }
+
+    public EmployeeExpenseResponseDto findExpenseDetails(Long expenseId) {
+        Expense expense = expenseRepository.findById(expenseId).orElseThrow(() ->  new ResourceNotFoundException("Expense not found"));
+        return mapToDto(expense);
+    }
 }

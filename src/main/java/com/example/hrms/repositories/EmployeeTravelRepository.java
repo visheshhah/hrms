@@ -9,6 +9,6 @@ import java.util.Optional;
 
 public interface EmployeeTravelRepository extends JpaRepository<EmployeeTravel, Long> {
     boolean existsByEmployeeIdAndTravelPlanId(Long employeeId, Long travelPlanId);
-    Optional<List<TravelPlan>> findByEmployeeId(Long id);
+    List<EmployeeTravel> findByEmployeeId(Long id);
 
 }

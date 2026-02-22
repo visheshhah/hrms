@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/job/referral")
+@RequestMapping("/job")
 @RequiredArgsConstructor
 public class JobReferralController {
     private final JobReferralService jobReferralService;

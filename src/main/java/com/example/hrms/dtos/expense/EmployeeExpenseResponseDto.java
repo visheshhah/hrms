@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -19,6 +20,6 @@ public class EmployeeExpenseResponseDto {
     private ExpenseStatus expenseStatus;
     private BigDecimal amount;
     private String description;
-    //new
-    private String filePath;
+
+    private List<ExpenseProofDto> proofs;
 }

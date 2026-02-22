@@ -9,6 +9,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,15 +24,7 @@ public class EmployeeService {
         List<Employee> employees = employeeRepository.findAll();
         return employees
                 .stream()
-                .map(employee -> {
-                    EmployeeDto employeeDto = new EmployeeDto();
-                    employeeDto.setId(employee.getId());
-                    employeeDto.setFirstName(employee.getFirstName());
-                    employeeDto.setLastName(employee.getLastName());
-                    employeeDto.setDesignation(employee.getDesignation());
-                    employeeDto.setDepartment(employee.getDepartment().getDepartmentName());
-                    return employeeDto;
-                })
+                .map(employee -> modelMapper.map(employee, EmployeeDto.class))
                 .toList();
     }
 
@@ -41,11 +34,11 @@ public class EmployeeService {
     }
 
     public List<EmployeeDto> getEmployeesByManagerId(Long managerId) {
-        Optional<Employee> employees = employeeRepository.findEmployeesByManagerId(managerId);
+        List<Employee> employees = employeeRepository.findEmployeesByManagerId(managerId).orElse(new ArrayList<>());
         return employees
                 .stream()
                 .map(employee -> modelMapper.map(employee, EmployeeDto.class))
-                .collect(Collectors.toList());
+                .toList();
 
     }
 
@@ -62,11 +55,12 @@ public class EmployeeService {
             current = current.getManager();
         }
 
+        Collections.reverse(chain);
 
         return chain
                 .stream()
                 .map(employee -> modelMapper.map(employee, EmployeeDto.class))
-                .collect(Collectors.toList());
+                .toList();
     }
 
 }

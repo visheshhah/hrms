@@ -43,7 +43,7 @@ public class Employee {
     @OneToMany(mappedBy = "manager")
     private List<Employee> employees;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     @JoinColumn(name = "department_id")
     private Department department;
 }

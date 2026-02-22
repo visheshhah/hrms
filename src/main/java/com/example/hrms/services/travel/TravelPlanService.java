@@ -148,7 +148,10 @@ public class TravelPlanService {
     public List<TravelPlanResponseDto> getTravelPlansByEmployeeId(Long userId){
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        List<TravelPlan> travelPlans = employeeTravelRepository.findByEmployeeId(user.getEmployee().getId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+        List<EmployeeTravel> employeeTravels = employeeTravelRepository.findByEmployeeId(user.getEmployee().getId());
+        List<TravelPlan> travelPlans = employeeTravels.stream()
+                .map(EmployeeTravel::getTravelPlan)
+                .toList();
         return travelPlans.stream()
                 .map(travelPlan -> modelMapper.map(travelPlan, TravelPlanResponseDto.class))
                 .toList();

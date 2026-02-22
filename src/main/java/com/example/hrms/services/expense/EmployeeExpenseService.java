@@ -1,7 +1,9 @@
 package com.example.hrms.services.expense;
 
 import com.example.hrms.dtos.expense.EmployeeExpenseResponseDto;
+import com.example.hrms.dtos.expense.ExpenseProofDto;
 import com.example.hrms.dtos.expense.SubmitExpenseDto;
+import com.example.hrms.dtos.file.FileResponseDto;
 import com.example.hrms.entities.*;
 import com.example.hrms.enums.ExpenseStatus;
 import com.example.hrms.exceptions.ResourceNotFoundException;
@@ -9,13 +11,18 @@ import com.example.hrms.repositories.*;
 import com.example.hrms.services.files.FileStorageService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -35,27 +42,82 @@ public class EmployeeExpenseService {
     private final DocumentTypeRepository documentTypeRepository;
 
 
+    public FileResponseDto getExpenseProofFile(Long proofId) throws IOException {
+
+        ExpenseProof proof = expenseProffRepository.findById(proofId)
+                .orElseThrow(() -> new IllegalArgumentException("Proof not found"));
+
+        Resource resource = fileStorageService
+                .load("expense-proofs", proof.getFilePath());
+
+        Path path = Paths.get("uploads/private/expense-proofs",
+                proof.getFilePath());
+
+        String detectedType = Files.probeContentType(path);
+
+        String contentType = (detectedType != null)
+                ? detectedType
+                : "application/octet-stream";
+
+        return new FileResponseDto(
+                resource,
+                proof.getFileName(),
+                contentType
+        );
+    }
+
     public List<EmployeeExpenseResponseDto>  findAllExpenses(Long userId, Long travelPlanId) {
         User uploader = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
         Employee employee = uploader.getEmployee();
-        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId()).orElseThrow(() -> new ResourceNotFoundException("NO EXPENSE FOUND"));
-        //TODO
-
+        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
 
         return expenses.stream()
-                .map(expense -> {
-                    EmployeeExpenseResponseDto employeeExpenseResponseDto = new EmployeeExpenseResponseDto();
-                    employeeExpenseResponseDto.setId(expense.getId());
-                    employeeExpenseResponseDto.setTravelPlanId(travelPlanId);
-                    employeeExpenseResponseDto.setRemark(expense.getRemark());
-                    employeeExpenseResponseDto.setCategoryName(expense.getCategory().getName());
-                    employeeExpenseResponseDto.setExpenseStatus(expense.getStatus());
-                    employeeExpenseResponseDto.setAmount(expense.getAmount());
-                    employeeExpenseResponseDto.setDescription(expense.getDescription());
+                .map(this::mapToDto)
+                .toList();
 
-                    return employeeExpenseResponseDto;
+
+
+//        return expenses.stream()
+//                .map(expense -> {
+//                    EmployeeExpenseResponseDto employeeExpenseResponseDto = new EmployeeExpenseResponseDto();
+//                    employeeExpenseResponseDto.setId(expense.getId());
+//                    employeeExpenseResponseDto.setTravelPlanId(travelPlanId);
+//                    employeeExpenseResponseDto.setRemark(expense.getRemark());
+//                    employeeExpenseResponseDto.setCategoryName(expense.getCategory().getName());
+//                    employeeExpenseResponseDto.setExpenseStatus(expense.getStatus());
+//                    employeeExpenseResponseDto.setAmount(expense.getAmount());
+//                    employeeExpenseResponseDto.setDescription(expense.getDescription());
+//
+//                    return employeeExpenseResponseDto;
+//                })
+//                .toList();
+    }
+
+    private EmployeeExpenseResponseDto mapToDto(Expense expense) {
+
+        EmployeeExpenseResponseDto dto = new EmployeeExpenseResponseDto();
+
+        dto.setId(expense.getId());
+        dto.setTravelPlanId(expense.getTravelPlan().getId());
+        dto.setRemark(expense.getRemark());
+        dto.setCategoryName(expense.getCategory().getName());
+        dto.setExpenseStatus(expense.getStatus());
+        dto.setAmount(expense.getAmount());
+        dto.setDescription(expense.getDescription());
+
+        List<ExpenseProofDto> proofDtos = expense.getProofs()
+                .stream()
+                .map(proof -> {
+                    ExpenseProofDto p = new ExpenseProofDto();
+                    p.setId(proof.getId());
+                    p.setFileName(proof.getFileName());
+                    return p;
                 })
                 .toList();
+
+        dto.setProofs(proofDtos);
+
+        return dto;
     }
 
     public Long addExpense(SubmitExpenseDto submitExpenseDto, Long userId, Long travelPlanId, MultipartFile file) {
@@ -103,7 +165,7 @@ public class EmployeeExpenseService {
         Employee employee = uploader.getEmployee();
 
         travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVEL PLAN FOUND"));
-        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId()).orElseThrow(() -> new ResourceNotFoundException("NO EXPENSE FOUND"));
+        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
 
         return expenses.stream()
                 .map(Expense::getAmount)

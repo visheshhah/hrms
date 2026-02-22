@@ -28,7 +28,7 @@ public class Expense {
     @JoinColumn(name = "travel_plain_id",  nullable = false)
     private TravelPlan travelPlan;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id",  nullable = false)
     private Employee employee;
 

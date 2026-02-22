@@ -39,9 +39,6 @@ public class EmployeeController {
     @GetMapping("/manager/{Id}")
     public ResponseEntity<List<EmployeeDto>> findEmployeesByManagerId(@PathVariable("Id") Long id) {
         List<EmployeeDto> employeeDtoList = employeeService.getEmployeesByManagerId(id);
-        if (employeeDtoList.isEmpty()) {
-            throw new ResourceNotFoundException("Employee not found");
-        }
         return new ResponseEntity<>(employeeDtoList, HttpStatus.OK);
     }
 
