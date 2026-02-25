@@ -58,4 +58,11 @@ public class TravelDocumentController {
         List<TravelDocumentResponseDto> employeeDocuments = travelDocumentService.findAllDocumentsByEmployeeId(employeeId, travelPlanId);
         return ResponseEntity.ok(employeeDocuments);
     }
+
+    //new
+    @GetMapping("/{travel-plan-id}")
+    public ResponseEntity<List<TravelDocumentResponseDto>> getCommonTravelPlanDocument(@PathVariable("travel-plan-id") Long travelPlanId) {
+        List<TravelDocumentResponseDto> employeeDocuments = travelDocumentService.findCommonDocumentByTravelPlanId(travelPlanId);
+        return ResponseEntity.ok(employeeDocuments);
+    }
 }

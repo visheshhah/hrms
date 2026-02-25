@@ -12,4 +12,6 @@ import java.util.List;
 public interface TravelDocumentRepository extends JpaRepository<TravelDocument, Long> {
 
     List<TravelDocument> findByTravelPlanIdAndEmployeeId(Long travelPlanId, Long employeeId);
+
+    List<TravelDocument> findByTravelPlanIdAndEmployeeIdIsNull(Long travelPlanId);
 }

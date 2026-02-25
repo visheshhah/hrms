@@ -183,4 +183,25 @@ public class TravelDocumentService {
 
 
     }
+
+    public List<TravelDocumentResponseDto> findCommonDocumentByTravelPlanId(Long travelPlanId) {
+        travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVELPLAN FOUND"));
+
+        List<TravelDocument> travelDocuments = travelDocumentRepository.findByTravelPlanIdAndEmployeeIdIsNull(travelPlanId);
+
+        return travelDocuments.stream()
+                .map(travelDocument -> {
+                    TravelDocumentResponseDto  travelDocumentResponseDto = new TravelDocumentResponseDto();
+                    travelDocumentResponseDto.setTravelDocumentId(travelDocument.getId());
+                    travelDocumentResponseDto.setTravelPlanId(travelPlanId);
+                    //travelDocumentResponseDto.setEmployeeId(employee.getId());
+                    travelDocumentResponseDto.setDocumentTypeName(travelDocument.getDocumentType().getName());
+                    travelDocumentResponseDto.setFileName(travelDocument.getFileName());
+                    travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
+                    travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
+
+                    return  travelDocumentResponseDto;
+                })
+                .toList();
+    }
 }

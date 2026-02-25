@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class Employee {
 
     private LocalDate joiningDate;
     private LocalDate dateOfBirth;
-    private double salary;
+    private BigDecimal salary;
     private String designation;
 
     @OneToOne(mappedBy = "employee")

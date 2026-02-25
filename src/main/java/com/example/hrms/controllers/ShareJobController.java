@@ -15,7 +15,7 @@ public class ShareJobController {
     private final ShareJobService shareJobService;
 
     @PostMapping("/{jobId}")
-    public ResponseEntity<Long> shareJob(@PathVariable("jobId") Long jobId, @AuthenticationPrincipal MyUserDetails userDetails, ShareJobDto shareJobDto){
+    public ResponseEntity<Long> shareJob(@PathVariable("jobId") Long jobId, @AuthenticationPrincipal MyUserDetails userDetails, @RequestBody ShareJobDto shareJobDto){
         Long sharedById = userDetails.getId();
         return ResponseEntity.ok(shareJobService.save(jobId, sharedById, shareJobDto));
     }
