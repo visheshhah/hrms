@@ -62,6 +62,7 @@ public class AuthService {
                     case "admin" -> roles.add(roleRepository.findByName(ERole.ROLE_ADMIN).orElseThrow());
                     case "hr" -> roles.add(roleRepository.findByName(ERole.ROLE_HR).orElseThrow());
                     case "manager" -> roles.add(roleRepository.findByName(ERole.ROLE_MANAGER).orElseThrow());
+                    case "reviewer" -> roles.add(roleRepository.findByName(ERole.ROLE_REVIEWER).orElseThrow());
 
                     default -> roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE).orElseThrow());
 

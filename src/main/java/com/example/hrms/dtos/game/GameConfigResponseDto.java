@@ -1,22 +1,18 @@
 package com.example.hrms.dtos.game;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Getter
 @Setter
-public class UpdateGameConfigurationDto {
+public class GameConfigResponseDto {
+    private Long id;
     private LocalTime startTime;
-
     private LocalTime endTime;
-
-    @Max(value = 4)
     private Integer maxPlayers;
-
     private Integer slotDuration;
+    private String gameName;
 }

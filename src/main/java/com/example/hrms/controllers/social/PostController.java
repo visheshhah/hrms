@@ -67,4 +67,17 @@ public class PostController {
 
         return ResponseEntity.ok(updatedPost);
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<List<PostResponseDto>> getMyPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal MyUserDetails userDetails
+    ) {
+
+        List<PostResponseDto> posts =
+                postService.getMyPosts(userDetails.getId(), page, size);
+
+        return ResponseEntity.ok(posts);
+    }
 }

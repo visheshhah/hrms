@@ -57,4 +57,9 @@ public class EmployeeController {
 
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<EmployeeDto> getEmployee(@AuthenticationPrincipal MyUserDetails userDetails) {
+        return new ResponseEntity<>(employeeService.getEmployeeDetail(userDetails.getId()), HttpStatus.OK);
+    }
+
 }

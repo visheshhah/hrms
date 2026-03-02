@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class CreateJobDto {
     @NotBlank
@@ -28,5 +30,9 @@ public class CreateJobDto {
 
     @NotBlank
     private String workPlaceType;
+
+    //
+     private List<Long> reviewerIds;
+    //
 
 }

@@ -17,14 +17,12 @@ public class CreateGameConfigurationDto {
     @NotEmpty
     private LocalTime endTime;
 
-    //temporary
-    @Min(value = 1)
-    private Integer minPlayers;
 
     @Max(value = 4)
     private Integer maxPlayers;
 
     @NotEmpty
+    @Min(value = 1)
     private Integer slotDuration;
 
     @NotEmpty

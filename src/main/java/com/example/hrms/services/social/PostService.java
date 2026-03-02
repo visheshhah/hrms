@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.AccessDeniedException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -125,14 +126,17 @@ public class PostService {
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Long currentUserId = user.getEmployee().getId();
+        LocalDate today = LocalDate.now();
 
         boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
 
 
-        Page<Post> postPage = postRepository.findByIsDeletedFalse(
-                PageRequest.of(page, size, Sort.by("createdAt").descending())
+        Page<Post> postPage = postRepository.findFeedPosts(
+                today,
+                PageRequest.of(page, size)
         );
 
+        //Sort.by("createdAt").descending()
         List<Post> posts = postPage.getContent();
 
         if (posts.isEmpty()) {
@@ -391,5 +395,118 @@ public class PostService {
         response.setPostTags(tagDtos);
 
         return response;
+    }
+
+    public List<PostResponseDto> getMyPosts(Long currentUserId, int page, int size) {
+
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Long employeeId = user.getEmployee().getId();
+
+        Page<Post> postPage = postRepository
+                .findByCreatedBy_IdAndIsDeletedFalse(
+                        employeeId,
+                        PageRequest.of(page, size, Sort.by("createdAt").descending())
+                );
+
+        List<Post> posts = postPage.getContent();
+
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = posts.stream()
+                .map(Post::getId)
+                .toList();
+
+        Map<Long, Long> likeCountMap =
+                likeRepository.countLikesByPostIds(postIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                PostCountDto::getPostId,
+                                PostCountDto::getCount
+                        ));
+
+        Map<Long, Long> commentCountMap =
+                commentRepository.countCommentsByPostIds(postIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                PostCountDto::getPostId,
+                                PostCountDto::getCount
+                        ));
+
+        return posts.stream()
+                .map(post -> buildPostResponse(
+                        post,
+                        likeCountMap.getOrDefault(post.getId(), 0L),
+                        commentCountMap.getOrDefault(post.getId(), 0L),
+                        employeeId
+                ))
+                .toList();
+    }
+
+    private PostResponseDto buildPostResponse(
+            Post post,
+            Long likeCount,
+            Long commentCount,
+            Long currentEmployeeId
+    ) {
+
+        PostResponseDto dto = new PostResponseDto();
+
+        // Core
+        dto.setId(post.getId());
+        dto.setTitle(post.getTitle());
+        dto.setDescription(post.getDescription());
+        dto.setCreatedAt(post.getCreatedAt());
+        dto.setIsSystemGenerated(post.getIsSystemGenerated());
+
+        // Author
+        dto.setEmployeeId(post.getCreatedBy().getId());
+        dto.setAuthorName(
+                post.getCreatedBy().getFirstName() + " " +
+                        post.getCreatedBy().getLastName()
+        );
+
+        // Interaction
+        dto.setLikeCount(likeCount);
+        dto.setCommentCount(commentCount);
+
+        boolean isLiked =
+                likeRepository.existsByPostIdAndLikedById(
+                        post.getId(),
+                        currentEmployeeId
+                );
+
+        dto.setIsLikedByCurrentUser(isLiked);
+
+        // Permissions
+        boolean isOwner =
+                post.getCreatedBy().getId().equals(currentEmployeeId);
+
+        dto.setCanEdit(isOwner);
+        dto.setCanDelete(isOwner);
+
+//        // Celebration highlight
+//        dto.setIsCelebrationToday(
+//                post.getCelebrationDate() != null &&
+//                        post.getCelebrationDate().equals(LocalDate.now())
+//        );
+
+        // Tags
+        List<TagsTypeDto> tagDtos = post.getPostTags()
+                .stream()
+                .map(postTag -> {
+                    TagsTypeDto tagDto = new TagsTypeDto();
+                    tagDto.setId(postTag.getTag().getId());
+                    tagDto.setTagName(postTag.getTag().getTagName());
+                    return tagDto;
+                })
+                .toList();
+
+        dto.setPostTags(tagDtos);
+
+        return dto;
     }
 }

@@ -104,4 +104,8 @@ public class EmployeeService {
 
     }
 
+    public EmployeeDto getEmployeeDetail(Long userId){
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return modelMapper.map(user.getEmployee(), EmployeeDto.class);
+    }
 }
