@@ -31,7 +31,7 @@ public class EmployeeService {
     private final DepartmentRepository departmentRepository;
 
     public List<EmployeeDto> getAllEmployees() {
-        List<Employee> employees = employeeRepository.findAll();
+        List<Employee> employees = employeeRepository.findAll().stream().filter(employee -> !employee.getId().equals(10L)).toList();
         return employees
                 .stream()
                 .map(employee -> modelMapper.map(employee, EmployeeDto.class))

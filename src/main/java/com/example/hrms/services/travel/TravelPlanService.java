@@ -1,21 +1,26 @@
 package com.example.hrms.services.travel;
 
+import com.example.hrms.dtos.notification.CreateNotificationDto;
 import com.example.hrms.dtos.travel.*;
 import com.example.hrms.entities.Employee;
 import com.example.hrms.entities.EmployeeTravel;
 import com.example.hrms.entities.TravelPlan;
 import com.example.hrms.entities.User;
+import com.example.hrms.enums.NotificationType;
+import com.example.hrms.enums.ReferenceType;
 import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.EmployeeRepository;
 import com.example.hrms.repositories.EmployeeTravelRepository;
 import com.example.hrms.repositories.TravelPlanRepository;
 import com.example.hrms.repositories.UserRepository;
-import jakarta.transaction.Transactional;
+import com.example.hrms.services.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +33,7 @@ public class TravelPlanService {
     private final ModelMapper modelMapper;
     private final UserRepository userRepository;
     private final EmployeeTravelRepository employeeTravelRepository;
+    private final NotificationService notificationService;
 
     public TravelPlanResponseDto createTravelPlan(TravelPlanDto travelPlanDto, Long creatorId) {
 
@@ -41,7 +47,6 @@ public class TravelPlanService {
         TravelPlan travelPlanEntity = new TravelPlan();
         List<EmployeeTravel> participants = new ArrayList<>();
 
-        //travelPlanEntity = modelMapper.map(travelPlanDto, TravelPlan.class);
         travelPlanEntity.setTitle(travelPlanDto.getTitle());
         travelPlanEntity.setDescription(travelPlanDto.getDescription());
         travelPlanEntity.setStartDate(travelPlanDto.getStartDate());
@@ -51,20 +56,45 @@ public class TravelPlanService {
         travelPlanEntity.setCreatedByEmployee(creatorEmployee);
         travelPlanEntity.setIsInternational(travelPlanDto.getIsInternational());
 
+        String destinationLocation = travelPlanDto.getDestinationLocation();
+        LocalDate startDate = travelPlanDto.getStartDate();
+        LocalDate endDate = travelPlanDto.getEndDate();
+        List<Employee> employees = new ArrayList<>();
+
         for(EmployeeTravelDto employee: travelPlanDto.getEmployees()) {
             Employee employeeEntity = employeeRepository.findById(employee.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("EMPLOYEE NOT FOUND"));
             EmployeeTravel employeeTravelEntity = new EmployeeTravel();
             employeeTravelEntity.setEmployee(employeeEntity);
             employeeTravelEntity.setTravelPlan(travelPlanEntity);
+            employees.add(employeeEntity);
             participants.add(employeeTravelEntity);
         }
         travelPlanEntity.setEmployeeTravels(participants);
 
         travelPlanEntity = travelPlanRepository.save(travelPlanEntity);
 
+        //
+        for(Employee employee: employees) {
+            sendNotification(creatorEmployee, employee, employee.getFirstName(), destinationLocation, startDate, endDate, travelPlanEntity.getId());
+        }
+        //
+
         return modelMapper.map(travelPlanEntity, TravelPlanResponseDto.class);
     }
 
+    private void sendNotification(Employee sender, Employee reciever, String name, String destination, LocalDate startDate, LocalDate endDate, Long travelPlanId) {
+        CreateNotificationDto createNotificationDto = new CreateNotificationDto();
+        createNotificationDto.setSender(sender);
+        createNotificationDto.setReceiver(reciever);
+        createNotificationDto.setTitle("Travel Plan Created");
+        createNotificationDto.setReferenceId(travelPlanId);
+        createNotificationDto.setReferenceType(ReferenceType.TRAVEL_PLAN);
+
+        String message = "Hello %s, you are scheduled to visit %s starting from %s to %s - .".formatted(name, destination, startDate, endDate);
+        createNotificationDto.setMessage(message);
+        createNotificationDto.setNotificationType(NotificationType.TRAVEL);
+        notificationService.createNotification(createNotificationDto);
+    }
 
 //    public TravelPlanResponseDto createTravelPlan(TravelPlanDto travelPlanDto, Long creatorId) {
 //

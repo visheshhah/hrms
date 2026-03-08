@@ -9,6 +9,7 @@ import com.example.hrms.enums.ExpenseStatus;
 import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
 import com.example.hrms.services.files.FileStorageService;
+import com.example.hrms.services.notification.NotificationService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -40,7 +41,7 @@ public class EmployeeExpenseService {
     private final EmployeeTravelRepository employeeTravelRepository;
     private final ExpenseProffRepository expenseProffRepository;
     private final DocumentTypeRepository documentTypeRepository;
-
+    private final NotificationService notificationService;
 
     public FileResponseDto getExpenseProofFile(Long proofId) throws IOException {
 
@@ -156,6 +157,13 @@ public class EmployeeExpenseService {
         expenseProof.setDocumentType(receiptType);
 
         expenseProffRepository.save(expenseProof);
+
+        notificationService.notifyExpenseSubmitted(
+                uploadedByEmployee,
+                travelPlan.getCreatedByEmployee(),
+                savedExpense,
+                travelPlan
+        );
 
         return savedExpense.getId();
     }

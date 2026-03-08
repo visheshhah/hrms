@@ -12,6 +12,7 @@ import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.EmployeeRepository;
 import com.example.hrms.repositories.ExpenseRepository;
 import com.example.hrms.repositories.UserRepository;
+import com.example.hrms.services.notification.NotificationService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -29,6 +30,7 @@ public class HrExpenseService {
     private final ModelMapper modelMapper;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final NotificationService notificationService;
 
 //    public HrDecisionResponseDto makeDecision(HrDecisionDto hrDecisionDto, Long hrId, String decision ) {
 //        Expense expense = expenseRepository.findById(hrDecisionDto.getExpenseId()).orElseThrow(() ->  new ResourceNotFoundException("EXPENSE NOT FOUND"));
@@ -67,6 +69,14 @@ public class HrExpenseService {
         expense.setDecisionMadeAt(Instant.now());
 
         Expense savedExpense = expenseRepository.save(expense);
+        Employee employee = savedExpense.getEmployee();
+
+        notificationService.notifyExpenseApproved(
+                decisionByEmployee,
+                employee,
+                savedExpense
+        );
+
         return modelMapper.map(savedExpense, HrDecisionResponseDto.class);
     }
 
@@ -87,6 +97,13 @@ public class HrExpenseService {
         expense.setDecisionMadeAt(Instant.now());
 
         Expense savedExpense = expenseRepository.save(expense);
+        Employee employee = savedExpense.getEmployee();
+
+        notificationService.notifyExpenseRejected(
+                decisionByEmployee,
+                employee,
+                savedExpense
+        );
         return modelMapper.map(savedExpense, HrDecisionResponseDto.class);
     }
 
