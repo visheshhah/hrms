@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ConfigureGameRepository extends JpaRepository<ConfigureGame, Long> {
     ConfigureGame findByGameGameName(String gameName);
+
+    boolean existsByGame_Id(Long gameId);
 }

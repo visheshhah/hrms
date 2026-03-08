@@ -26,7 +26,7 @@ public class SlotFinalizationScheduler {
     private final GameSlotRepository gameSlotRepository;
     private final SlotFinalizationService slotFinalizationService;
 
-    //@Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 60000)
     //@Scheduled(cron = "0 * * * * *")
     public void finalizeEligibleSlots() {
 

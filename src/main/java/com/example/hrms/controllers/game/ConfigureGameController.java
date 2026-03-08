@@ -36,4 +36,9 @@ public class ConfigureGameController {
     public ResponseEntity<List<GameConfigResponseDto>> getGameConfiguration(@AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
         return ResponseEntity.ok(configureGameService.getGameConfigurations(userDetails.getId()));
     }
+
+    @GetMapping("/{configure-game-id}")
+    public ResponseEntity<GameConfigResponseDto> getGameConfigurationById(@PathVariable("configure-game-id") Long configureGameId, @AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
+        return ResponseEntity.ok(configureGameService.getGameConfigurationById(configureGameId, userDetails.getId()));
+    }
 }

@@ -27,6 +27,7 @@ public interface SlotRegistrationRepository extends JpaRepository<SlotRegistrati
 
     @Query("""
    SELECT r FROM SlotRegistration r
+   JOIN FETCH r.employee
    WHERE r.slot = :slot
    AND r.status = 'PENDING'
    ORDER BY r.slotCountAtRequest ASC, r.requestedAt ASC

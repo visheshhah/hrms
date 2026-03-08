@@ -8,6 +8,7 @@ import com.example.hrms.enums.SlotBookingStatus;
 import com.example.hrms.enums.SlotRegistrationStatus;
 import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
+import com.example.hrms.services.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class SlotRegistrationService {
     private final SlotRegistrationRepository slotRegistrationRepository;
     private final EmployeeGameInterestRepository employeeGameInterestRepository;
     private final SlotBookingRepository slotBookingRepository;
+    private final NotificationService notificationService;
 
 
     public void registerInterest(Long slotId,
@@ -71,6 +73,10 @@ public class SlotRegistrationService {
 
                 ensureNotAlreadyRegistered(employee, slot);
 
+                //
+                checkBookingConflicts(slot, employee);
+                //
+
                 WeeklySlotCount weeklySlotCount =
                         getOrCreateWeeklySlotCount(employee, slot.getGame(), weekStart);
 
@@ -81,6 +87,7 @@ public class SlotRegistrationService {
                 registration.setStatus(SlotRegistrationStatus.PENDING);
 
                 slotRegistrationRepository.save(registration);
+                notificationService.notifyRegistrationMade(bookedBy, employee, slot);
             }
     }
     //
@@ -102,6 +109,7 @@ public class SlotRegistrationService {
             }
 
             booking.setStatus(SlotBookingStatus.CANCELLED);
+            notificationService.notifySlotBookingCancelled(bookedBy, bookedBy, gameSlot);
             return;
         }
 
@@ -112,6 +120,7 @@ public class SlotRegistrationService {
             }
 
             registration.setStatus(SlotRegistrationStatus.CANCELLED);
+            notificationService.notifySlotRegistrationCancelled(bookedBy, bookedBy, gameSlot);
             return;
         }
 
@@ -232,6 +241,24 @@ public class SlotRegistrationService {
 
             return weeklySlotCount;
         }
+
+        //block booking if the timing of slot being registered conflicts with any existing booking
+        private void checkBookingConflicts(GameSlot gameSlot, Employee employee) {
+            LocalDate slotDate = gameSlot.getSlotDate();
+            LocalTime slotStartTime = gameSlot.getStartTime();
+            LocalTime slotEndTime = gameSlot.getEndTime();
+
+            List<SlotBooking> slotBookings = slotBookingRepository.findByEmployeeAndDate(employee, slotDate);
+            for (SlotBooking slotBooking : slotBookings) {
+                if(slotBooking.getGameSlot().getStartTime().isBefore(slotEndTime) &&
+                    slotBooking.getGameSlot().getEndTime().isAfter(slotStartTime)){
+                    throw new IllegalStateException("One or more employee's existing slot booking timings conflict with this slot");
+                }
+            }
+        }
+
+
+        //
     }
 
 //    public void registerInterest(Long slotId, Long userId, RegisterSlotInterestDto dto) {

@@ -30,6 +30,10 @@ public class ConfigureGameService {
         User creator = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Employee createdByEmployee = creator.getEmployee();
 
+        if(configureGameRepository.existsByGame_Id(createGameConfigurationDto.getGameId())){
+            throw new IllegalStateException("Game already configured");
+        }
+
         Game game = gameRepository.findById(createGameConfigurationDto.getGameId()).orElseThrow(() -> new ResourceNotFoundException("Game not found"));
 
         ConfigureGame configureGame = new ConfigureGame();
@@ -112,5 +116,26 @@ public class ConfigureGameService {
                     return gameConfigResponseDto;
                 })
                 .toList();
+    }
+
+    public GameConfigResponseDto getGameConfigurationById(Long configureGameId, Long userId) throws AccessDeniedException {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
+        if(!isHr) {
+            throw new AccessDeniedException("You are not allowed to access this resource");
+        }
+
+
+        ConfigureGame configureGame = configureGameRepository.findById(configureGameId).orElseThrow(() -> new ResourceNotFoundException("Game configuration does not exist"));
+        GameConfigResponseDto gameConfigResponseDto = new GameConfigResponseDto();
+        gameConfigResponseDto.setId(configureGame.getId());
+        gameConfigResponseDto.setStartTime(configureGame.getStartTime());
+        gameConfigResponseDto.setEndTime(configureGame.getEndTime());
+        gameConfigResponseDto.setMaxPlayers(configureGame.getMaxPlayers());
+        gameConfigResponseDto.setSlotDuration(configureGame.getSlotDuration());
+        gameConfigResponseDto.setGameName(configureGame.getGame().getGameName());
+
+        return gameConfigResponseDto;
     }
 }
