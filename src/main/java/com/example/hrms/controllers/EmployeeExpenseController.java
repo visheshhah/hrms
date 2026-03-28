@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 @RestController
@@ -41,13 +42,6 @@ public class EmployeeExpenseController {
         return ResponseEntity.ok(employeeExpenseService.addExpense(expenseDto, employeeId, travelPlanId, file));
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    @PostMapping("/{travel-plan-id}/total")
-    public ResponseEntity<BigDecimal> getTotalClaimAmount(@PathVariable("travel-plan-id") Long travelPlanId, @AuthenticationPrincipal MyUserDetails userDetails) {
-        Long employeeId = userDetails.getId();
-        return ResponseEntity.ok(employeeExpenseService.getTotalClaimedAmount(travelPlanId, employeeId));
-    }
-
     @GetMapping("/expense-proofs/{id}/view")
     public ResponseEntity<Resource> viewProof(@PathVariable Long id) throws IOException {
 
@@ -58,5 +52,23 @@ public class EmployeeExpenseController {
                         "inline; filename=\"" + file.getOriginalFileName() + "\"")
                 .contentType(MediaType.parseMediaType(file.getContentType()))
                 .body(file.getResource());
+    }
+
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    @GetMapping("/{travel-plan-id}/claim/total")
+    public ResponseEntity<BigDecimal> getTotalClaimedAmountByTravelPlanAndEmployee(@PathVariable("travel-plan-id") Long travelPlanId, @AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
+        return ResponseEntity.ok(employeeExpenseService.getTotalClaimedAmountByTravelPlanAndEmployee(travelPlanId, userDetails.getId()));
+    }
+
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    @GetMapping("/{travel-plan-id}/approved/total")
+    public ResponseEntity<BigDecimal> getTotalApprovedAmountByTravelPlanAndEmployee(@PathVariable("travel-plan-id") Long travelPlanId, @AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
+        return ResponseEntity.ok(employeeExpenseService.getTotalApprovedAmountByTravelPlanAndEmployee(travelPlanId, userDetails.getId()));
+    }
+
+    @GetMapping("/{travel-plan-id}/{employee-id}/filter")
+    public ResponseEntity<List<EmployeeExpenseResponseDto>> getEmployeeExpenseByStatus(@PathVariable("travel-plan-id") Long travelPlanId, @PathVariable("employee-id")  Long employeeId, @RequestParam(defaultValue = "submitted") String status) {
+        List<EmployeeExpenseResponseDto> employeeExpenses = employeeExpenseService.findAllExpenseByStatus(employeeId, travelPlanId, status);
+        return ResponseEntity.ok(employeeExpenses);
     }
 }

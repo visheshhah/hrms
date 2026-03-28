@@ -7,13 +7,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
 @Entity
 @Getter
 @Setter
-public class Employee {
+public class Employee{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -47,4 +48,12 @@ public class Employee {
     @ManyToOne
     @JoinColumn(name = "department_id")
     private Department department;
+
+    @ManyToOne
+    @JoinColumn(name = "deleted_by_id")
+    private Employee deletedBy;
+
+    private Boolean isDeleted = Boolean.FALSE;
+
+    private Instant deletedAt;
 }

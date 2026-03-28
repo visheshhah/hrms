@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -203,5 +205,53 @@ public class TravelDocumentService {
                     return  travelDocumentResponseDto;
                 })
                 .toList();
+    }
+
+    @Transactional
+    public void deleteTravelDocument(Long travelDocumentId, Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("USER FOUND"));
+        TravelDocument travelDocument = travelDocumentRepository.findById(travelDocumentId).orElseThrow(() -> new ResourceNotFoundException("NO DOCUMENT FOUND"));
+        TravelPlan travelPlan = travelDocument.getTravelPlan();
+        if(Boolean.FALSE.equals(travelPlan.getIsActive())){
+            throw new IllegalStateException("Travel Plan has been deleted.");
+        }
+        validateDeletionTime(travelPlan);
+        validateRoleBeforeDeletion(user, travelDocument);
+        fileStorageService.delete("travel-documents", travelDocument.getFilePath());
+        travelDocumentRepository.delete(travelDocument);
+
+    }
+
+    //Hr can delete common docs
+    //Employee can delete only his docs
+    public void validateRoleBeforeDeletion(User user, TravelDocument travelDocument){
+        boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
+        boolean isEmployee = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_EMPLOYEE);
+        EOwnerType ownerType = travelDocument.getOwnerType();
+        if(isHr){
+            if(ownerType == EOwnerType.EMPLOYEE){
+                throw new AccessDeniedException("You are not allowed to perform this action.");
+            }
+        }
+        if(isEmployee){
+            if(ownerType == EOwnerType.HR){
+                throw new AccessDeniedException("You are not allowed to perform this action.");
+            }
+            if(!user.getEmployee().getId().equals(travelDocument.getEmployee().getId())) {
+                throw new AccessDeniedException("You are not allowed to perform this action.");
+            }
+
+        }
+
+    }
+
+    public void validateDeletionTime(TravelPlan travelPlan){
+        LocalDate now = LocalDate.now();
+        LocalDate startDate = travelPlan.getStartDate();
+
+        if(now.isBefore(startDate)){
+            throw new IllegalStateException("Document cannot be deleted because travel plan has already been started.");
+        }
+
     }
 }

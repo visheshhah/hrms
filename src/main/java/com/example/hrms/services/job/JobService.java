@@ -1,9 +1,7 @@
 package com.example.hrms.services.job;
 
 import com.example.hrms.dtos.file.FileResponseDto;
-import com.example.hrms.dtos.job.CreateJobDto;
-import com.example.hrms.dtos.job.JobResponseDto;
-import com.example.hrms.dtos.job.ViewJobReferralDto;
+import com.example.hrms.dtos.job.*;
 import com.example.hrms.entities.*;
 import com.example.hrms.enums.ERole;
 import com.example.hrms.exceptions.ResourceNotFoundException;
@@ -31,6 +29,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@org.springframework.transaction.annotation.Transactional
 public class JobService {
     private final JobRepository jobRepository;
     private final ModelMapper modelMapper;
@@ -80,6 +79,83 @@ public class JobService {
         }
         //
         return modelMapper.map(job, JobResponseDto.class);
+    }
+
+    public JobResponseDto updateJob(Long jobId, UpdateJobDto updateJobDto, Long userId) {
+        Job job = jobRepository.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if(updateJobDto.getTitle() != null || !updateJobDto.getTitle().isEmpty()){
+            job.setTitle(updateJobDto.getTitle());
+        }
+
+        if(updateJobDto.getDescription() != null || !updateJobDto.getDescription().isEmpty()){
+            job.setDescription(updateJobDto.getDescription());
+        }
+        if(updateJobDto.getCompanyName() != null || !updateJobDto.getCompanyName().isEmpty()){
+            job.setCompanyName(updateJobDto.getCompanyName());
+        }
+        if(updateJobDto.getJobType() != null || !updateJobDto.getJobType().isEmpty()){
+            job.setJobType(updateJobDto.getJobType());
+        }
+        if(updateJobDto.getLocation() != null || !updateJobDto.getLocation().isEmpty()){
+            job.setLocation(updateJobDto.getLocation());
+        }
+        if(updateJobDto.getWorkPlaceType() != null || !updateJobDto.getWorkPlaceType().isEmpty()){
+            job.setWorkPlaceType(updateJobDto.getWorkPlaceType());
+        }
+        if((updateJobDto.getMinExperience() != null || !updateJobDto.getMinExperience().isNaN())
+            && (updateJobDto.getMaxExperience() != null || !updateJobDto.getMaxExperience().isNaN())){
+            if(updateJobDto.getMaxExperience() < updateJobDto.getMinExperience()){
+                throw new IllegalArgumentException("Max Experience cannot be less than Min Experience");
+            }
+            job.setMaxExperience(updateJobDto.getMaxExperience());
+            job.setMinExperience(updateJobDto.getMinExperience());
+        }
+        if(updateJobDto.getMinExperience() != null || !updateJobDto.getMinExperience().isNaN()){
+            if(updateJobDto.getMaxExperience() < updateJobDto.getMinExperience()){
+                throw new IllegalArgumentException("Min Experience cannot be less than Max Experience");
+            }
+            job.setMinExperience(updateJobDto.getMinExperience());
+        }
+        if(updateJobDto.getMaxExperience() != null || !updateJobDto.getMaxExperience().isNaN()){
+            if(updateJobDto.getMaxExperience() < updateJobDto.getMinExperience()){
+                throw new IllegalArgumentException("Max Experience cannot be less than Min Experience");
+            }
+            job.setMaxExperience(updateJobDto.getMaxExperience());
+        }
+
+        List<JobCvReviewer> existingCvReviewers = job.getJobCvReviewers();
+
+        Set<Long> existingCvReviewersIds = existingCvReviewers.stream().map(cvReviewer -> cvReviewer.getReviewer().getId()).collect(Collectors.toSet());
+        Set<Long> newCvReviewersIds = updateJobDto.getJobCvReviewerIds() == null
+                ? Set.of()
+                : new HashSet<>(updateJobDto.getJobCvReviewerIds());
+
+        Set<Long> toAdd = new HashSet<>(newCvReviewersIds);
+        toAdd.removeAll(existingCvReviewersIds);
+
+        Set<Long> toRemove = new HashSet<>(existingCvReviewersIds);
+        toRemove.removeAll(newCvReviewersIds);
+
+        if (!toRemove.isEmpty()) {
+            jobCvReviewerRepository.deleteByJobAndEmployeeIdIn(job, toRemove);
+        }
+
+        if (!toAdd.isEmpty()) {
+            List<Employee> employeesToAdd = employeeRepository.findAllById(toAdd);
+
+            for (Employee employee : employeesToAdd) {
+                JobCvReviewer jobCvReviewer = new JobCvReviewer();
+                jobCvReviewer.setReviewer(employee);
+                jobCvReviewer.setJob(job);
+                jobCvReviewerRepository.save(jobCvReviewer);
+            }
+        }
+
+        Job updatedJob = jobRepository.save(job);
+        return modelMapper.map(updatedJob, JobResponseDto.class);
+
     }
 
     public JobResponseDto getJobById(Long id) {
@@ -159,5 +235,24 @@ public class JobService {
                 .toList();
 
 
+    }
+
+    public JobDetailDto getJobDetailById(Long id) {
+        Job job = jobRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+        JobDetailDto jobDetailDto =new JobDetailDto();
+        jobDetailDto.setId(job.getId());
+        jobDetailDto.setTitle(job.getTitle());
+        jobDetailDto.setDescription(job.getDescription());
+        jobDetailDto.setCompanyName(job.getCompanyName());
+        jobDetailDto.setLocation(job.getLocation());
+        jobDetailDto.setWorkPlaceType(job.getWorkPlaceType());
+        jobDetailDto.setJobType(job.getJobType());
+        jobDetailDto.setMinExperience(job.getMinExperience());
+        jobDetailDto.setMaxExperience(job.getMaxExperience());
+        Set<Long> reviewrIds = job.getJobCvReviewers().stream()
+                .map(j -> j.getReviewer().getId())
+                        .collect(Collectors.toSet());
+        jobDetailDto.setReviewerIds(reviewrIds);
+        return jobDetailDto;
     }
 }

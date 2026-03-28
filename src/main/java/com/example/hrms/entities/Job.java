@@ -32,11 +32,11 @@ public class Job {
 
     @Column(nullable = false)
     @Min(value = 0)
-    private double minExperience;
+    private Double minExperience;
 
     @Column(nullable = false)
     @Min(value = 0)
-    private double maxExperience;
+    private Double maxExperience;
 
     @Column(nullable = false)
     private String jobType;

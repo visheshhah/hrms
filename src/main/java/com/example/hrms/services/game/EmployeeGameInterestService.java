@@ -1,16 +1,17 @@
 package com.example.hrms.services.game;
 
 import com.example.hrms.dtos.game.EmployeeGameInterestResponseDto;
+import com.example.hrms.dtos.game.GameTabDto;
 import com.example.hrms.dtos.game.UpdateEmployeeGameInterestDto;
-import com.example.hrms.entities.Employee;
-import com.example.hrms.entities.EmployeeGameInterest;
-import com.example.hrms.entities.Game;
-import com.example.hrms.entities.User;
+import com.example.hrms.dtos.travel.EmployeeDto;
+import com.example.hrms.entities.*;
 import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.EmployeeGameInterestRepository;
 import com.example.hrms.repositories.GameRepository;
+import com.example.hrms.repositories.GameSlotRepository;
 import com.example.hrms.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,8 @@ public class EmployeeGameInterestService {
     private final EmployeeGameInterestRepository employeeGameInterestRepository;
     private final UserRepository userRepository;
     private final GameRepository gameRepository;
+    private final GameSlotRepository gameslotRepository;
+    private final ModelMapper modelMapper;
 
     public void updateEmployeeGameInterest(Long userId, UpdateEmployeeGameInterestDto dto)
     {
@@ -75,6 +78,40 @@ public class EmployeeGameInterestService {
                     employeeGameInterestResponseDto.setGameId(gameInterest.getGame().getId());
                     employeeGameInterestResponseDto.setGameName(gameInterest.getGame().getGameName());
                     return employeeGameInterestResponseDto;
+                })
+                .toList();
+    }
+
+    public List<EmployeeDto> getInterestedPlayers(Long userId, Long gameSlotId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Employee employee = user.getEmployee();
+        GameSlot gameSlot = gameslotRepository.findById(gameSlotId).orElseThrow(() -> new ResourceNotFoundException("Game slot not found"));
+        Game game = gameSlot.getGame();
+        List<EmployeeGameInterest> employeeGameInterests = employeeGameInterestRepository.findByGame(game);
+        List<Employee> employees = employeeGameInterests.stream()
+                .map(EmployeeGameInterest::getEmployee)
+                .filter(e -> !e.getId().equals(employee.getId()))
+                .toList();
+        return employees.stream()
+                .map(e -> modelMapper.map(e, EmployeeDto.class))
+                .toList();
+    }
+
+    public List<GameTabDto> getEmployeeGameTabs(Long userId){
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Employee employee = user.getEmployee();
+
+        List<EmployeeGameInterest> interests =
+                employeeGameInterestRepository.findByEmployee(employee);
+
+        return interests.stream()
+                .map(interest -> {
+                    Game game = interest.getGame();
+
+                    return new GameTabDto(
+                            game.getGameName(),
+                            game.getId()
+                    );
                 })
                 .toList();
     }

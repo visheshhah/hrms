@@ -25,4 +25,10 @@ public interface EmployeeGameInterestRepository extends JpaRepository<EmployeeGa
    AND e.game.id IN :gameIds
 """)
     void deleteByEmployeeAndGameIdIn(Employee employee, Set<Long> gameIds);
+
+//    @Query("""
+//    SELECT eg FROM EmployeeGameInterest eg
+//    WHERE eg.game = :game
+//""")
+    List<EmployeeGameInterest> findByGame(Game game);
 }

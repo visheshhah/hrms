@@ -4,6 +4,7 @@ import com.example.hrms.enums.TravelStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ public class TravelPlan extends BaseClass{
     @Column(nullable = false)
     private LocalDate endDate;
 
+    //@Enumerated(EnumType.STRING)
     private TravelStatus status = TravelStatus.DRAFT;
 
     @Column(nullable = false)
@@ -53,5 +55,13 @@ public class TravelPlan extends BaseClass{
 
     @OneToMany(mappedBy = "travelPlan", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<TravelDocument>  travelDocuments = new ArrayList<>();
+
+    //
+    @ManyToOne
+    @JoinColumn(name = "deleted_by_id")
+    private Employee deletedBy;
+
+    private Instant deletedAt;
+    //
 
 }

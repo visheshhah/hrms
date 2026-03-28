@@ -9,6 +9,7 @@ import com.example.hrms.services.job.JobReferralService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +21,7 @@ public class JobReferralController {
     private final JobReferralService jobReferralService;
 
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping(value = "/{job-id}/refer", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<JobReferralResponseDto> giveReferral(@PathVariable("job-id") Long jobId, @RequestPart("file") MultipartFile file, @RequestPart("data") JobReferralDto referralDto, @AuthenticationPrincipal MyUserDetails userDetails){
         Long employeeId = userDetails.getId();

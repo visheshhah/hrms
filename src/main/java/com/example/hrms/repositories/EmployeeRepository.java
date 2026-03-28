@@ -28,4 +28,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findEmployeesWithBirthday(int month, int day);
 
     Optional<Employee> findByEmail(String email);
+
+    @Query("""
+       SELECT e FROM Employee e
+       WHERE e.id <> 10
+       AND e.isDeleted = false
+    """)
+    List<Employee> findAllEmployees();
 }

@@ -1,9 +1,7 @@
 package com.example.hrms.controllers;
 
 import com.example.hrms.dtos.file.FileResponseDto;
-import com.example.hrms.dtos.job.CreateJobDto;
-import com.example.hrms.dtos.job.JobResponseDto;
-import com.example.hrms.dtos.job.ViewJobReferralDto;
+import com.example.hrms.dtos.job.*;
 import com.example.hrms.entities.MyUserDetails;
 import com.example.hrms.services.job.JobService;
 import com.example.hrms.utils.JwtUtils;
@@ -40,12 +38,21 @@ public class JobController {
         return ResponseEntity.ok(jobResponseDto);
     }
 
+    @PreAuthorize("hasRole('HR')")
+    @PatchMapping("/update/{jobId}")
+    public ResponseEntity<JobResponseDto> updateJob(@PathVariable("jobId") Long jobId, @RequestBody UpdateJobDto updateJobDto, @AuthenticationPrincipal MyUserDetails userDetails) {
+        JobResponseDto jobResponseDto = jobService.updateJob(jobId, updateJobDto, userDetails.getId());
+        return ResponseEntity.ok(jobResponseDto);
+    }
+
+
     @GetMapping("/{Id}")
     public ResponseEntity<JobResponseDto> getJobById(@PathVariable("Id") Long id) {
         JobResponseDto jobResponseDto = jobService.getJobById(id);
         return ResponseEntity.ok(jobResponseDto);
     }
 
+    @PreAuthorize("hasRole('HR')")
     @DeleteMapping("/{jobId}")
     public ResponseEntity<JobResponseDto> deleteJobById(@PathVariable("jobId") Long jobId, @AuthenticationPrincipal MyUserDetails userDetails) {
         jobService.closeJob(jobId, userDetails.getId());
@@ -57,6 +64,7 @@ public class JobController {
         return ResponseEntity.ok(jobService.getReferralsByJobId(jobId, userDetails.getId()));
     }
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping("/cv/{id}/view")
     public ResponseEntity<Resource> viewCv(@PathVariable Long id) throws IOException {
 
@@ -67,6 +75,13 @@ public class JobController {
                         "inline; filename=\"" + file.getOriginalFileName() + "\"")
                 .contentType(MediaType.parseMediaType(file.getContentType()))
                 .body(file.getResource());
+    }
+
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    @GetMapping("/{Id}/detail")
+    public ResponseEntity<JobDetailDto> getDetailJobById(@PathVariable("Id") Long id) {
+        JobDetailDto jobResponseDto = jobService.getJobDetailById(id);
+        return ResponseEntity.ok(jobResponseDto);
     }
 
 }

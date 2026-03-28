@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.time.LocalTime;
 
 @Entity
@@ -41,5 +42,12 @@ public class ConfigureGame extends BaseClass{
     @JoinColumn(name = "game_id", nullable = false, unique = true)
     private Game game;
 
+    private Boolean isActive = true;
+
+    @ManyToOne
+    @JoinColumn(name = "deleted_by_id")
+    private Employee deletedBy;
+
+    private Instant deletedAt;
 
 }

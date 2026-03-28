@@ -8,5 +8,6 @@ import org.springframework.stereotype.Repository;
 public interface ConfigureGameRepository extends JpaRepository<ConfigureGame, Long> {
     ConfigureGame findByGameGameName(String gameName);
 
-    boolean existsByGame_Id(Long gameId);
+
+    boolean existsByGame_IdAndIsActiveFalse(Long gameId);
 }

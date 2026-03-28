@@ -5,6 +5,7 @@ import com.example.hrms.dtos.expense.ExpenseProofDto;
 import com.example.hrms.dtos.expense.SubmitExpenseDto;
 import com.example.hrms.dtos.file.FileResponseDto;
 import com.example.hrms.entities.*;
+import com.example.hrms.enums.ERole;
 import com.example.hrms.enums.ExpenseStatus;
 import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
@@ -25,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,6 +44,7 @@ public class EmployeeExpenseService {
     private final ExpenseProffRepository expenseProffRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final NotificationService notificationService;
+    private final HrExpenseService hrExpenseService;
 
     public FileResponseDto getExpenseProofFile(Long proofId) throws IOException {
 
@@ -67,7 +70,7 @@ public class EmployeeExpenseService {
         );
     }
 
-    public List<EmployeeExpenseResponseDto>  findAllExpenses(Long userId, Long travelPlanId) {
+    public List<EmployeeExpenseResponseDto> findAllExpenses(Long userId, Long travelPlanId) {
         User uploader = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
         Employee employee = uploader.getEmployee();
         List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
@@ -75,7 +78,6 @@ public class EmployeeExpenseService {
         return expenses.stream()
                 .map(this::mapToDto)
                 .toList();
-
 
 
 //        return expenses.stream()
@@ -135,6 +137,7 @@ public class EmployeeExpenseService {
 
         DocumentType receiptType = documentTypeRepository.findByCode("RECEIPT").orElseThrow(() -> new ResourceNotFoundException("Receipt document type missing"));
 
+        validateExpenseSubmissionDate(travelPlan);
         validateFileFormat(file, receiptType);
         Expense expense = new Expense();
         expense.setAmount(submitExpenseDto.getAmount());
@@ -168,24 +171,24 @@ public class EmployeeExpenseService {
         return savedExpense.getId();
     }
 
-    public BigDecimal getTotalClaimedAmount(Long travelPlanId, Long userId) {
-        User uploader = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
-        Employee employee = uploader.getEmployee();
-
-        travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVEL PLAN FOUND"));
-        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
-
-        return expenses.stream()
-                .map(Expense::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-
-    }
+//    public BigDecimal getTotalClaimedAmount(Long travelPlanId, Long userId) {
+//        User uploader = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+//        Employee employee = uploader.getEmployee();
+//
+//        travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVEL PLAN FOUND"));
+//        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
+//
+//        return expenses.stream()
+//                .map(Expense::getAmount)
+//                .reduce(BigDecimal.ZERO, BigDecimal::add);
+//
+//
+//    }
 
     private void validateFileFormat(MultipartFile file, DocumentType documentType) {
         String originalFilename = file.getOriginalFilename();
 
-        if(originalFilename == null || !originalFilename.contains(".")) {
+        if (originalFilename == null || !originalFilename.contains(".")) {
             throw new IllegalArgumentException("Invalid file format");
         }
 
@@ -195,24 +198,88 @@ public class EmployeeExpenseService {
                 .map(String::trim)
                 .anyMatch(s -> s.equalsIgnoreCase(extension));
 
-        if(!allowed) {
+        if (!allowed) {
             throw new IllegalArgumentException("Invalid file format");
         }
 
     }
 
-    private void validateParticipant(Long travelPlanId, Long employeeId){
+    private void validateParticipant(Long travelPlanId, Long employeeId) {
         boolean exists = employeeTravelRepository.existsByEmployeeIdAndTravelPlanId(employeeId, travelPlanId);
-        if(!exists) {
+        if (!exists) {
             throw new AccessDeniedException("You are not assigned to this travel");
         }
     }
 
-    private void validateFilePresence(MultipartFile file){
-        if(file == null || file.isEmpty()) {
+    private void validateFilePresence(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Provided file is empty");
         }
     }
+
+    //    Employee can add expenses only after trip start date and no later than
+//      10 days after trip end date:
+    private void validateExpenseSubmissionDate(TravelPlan travelPlan) {
+        LocalDate startDate = travelPlan.getStartDate();
+        LocalDate endDate = travelPlan.getEndDate().plusDays(10);
+        LocalDate now = LocalDate.now();
+
+        if (now.isBefore(startDate)) {
+            throw new IllegalArgumentException("Cannot submit expense trip has not started yet");
+        }
+
+        if (now.isAfter(endDate)) {
+            throw new IllegalArgumentException("Cannot submit expense as time limit has been reached");
+        }
+
+    }
+
+
+    public BigDecimal getTotalClaimedAmountByTravelPlanAndEmployee(Long travelPlanId, Long userId) throws java.nio.file.AccessDeniedException {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+
+        travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVEL PLAN FOUND"));
+        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeIdAndStatusSubmitted(travelPlanId, user.getEmployee().getId());
+
+        return expenses.stream()
+                .map(Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+
+    }
+
+    public BigDecimal getTotalApprovedAmountByTravelPlanAndEmployee(Long travelPlanId, Long userId) throws java.nio.file.AccessDeniedException {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+
+        travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ResourceNotFoundException("NO TRAVEL PLAN FOUND"));
+        List<Expense> expenses = expenseRepository.findApprovedExpenseByTravelPlanIdAndEmployeeIdAndStatusApproved(travelPlanId, user.getEmployee().getId());
+
+        return expenses.stream()
+                .map(Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+
+    }
+
+    public void deleteExpense(Long expenseId){
+        Expense expense = expenseRepository.findById(expenseId).orElseThrow(() -> new ResourceNotFoundException("EXPENSE NOT FOUND"));
+        if(!expense.getStatus().equals(ExpenseStatus.DRAFT)){
+            throw new IllegalStateException("Cannot delete expense");
+        }
+
+        //I have to delete expense record and proof associated with the record
+        //currently i have a list of proof which i added for future but currently
+        //there will be only one expense in the proofs
+        ExpenseProof expenseProof = expense.getProofs().get(0);
+        fileStorageService.delete("expense-proofs", expenseProof.getFilePath());
+        expenseProffRepository.delete(expenseProof);
+        expenseRepository.delete(expense);
+    }
+
+    public List<EmployeeExpenseResponseDto> findAllExpenseByStatus(Long employeeId, Long travelPlanId, String status) {
+       return hrExpenseService.findAllExpenseByStatus(employeeId, travelPlanId, status);
+    }
+}
 
 //    private Employee getLoggedInEmployee() {
 //        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -229,4 +296,4 @@ public class EmployeeExpenseService {
 //
 //
 //    }
-}
+

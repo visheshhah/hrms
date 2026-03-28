@@ -16,8 +16,15 @@ public interface SlotRegistrationRepository extends JpaRepository<SlotRegistrati
 
     SlotRegistration findByEmployeeAndSlot(Employee employee, GameSlot slot);
 
-    boolean existsByEmployeeAndSlot(Employee employee, GameSlot slot);
+    //26/3
+    SlotRegistration findByEmployeeAndSlotAndStatusNot(
+            Employee employee,
+            GameSlot slot,
+            SlotRegistrationStatus status
+    );
 
+    //boolean existsByEmployeeAndSlot(Employee employee, GameSlot slot);
+    boolean existsByEmployeeAndSlotAndStatusNot(Employee employee, GameSlot slot, SlotRegistrationStatus status);
 
 
     List<SlotRegistration> findBySlotAndStatus(

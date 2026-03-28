@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.AccessDeniedException;
 import java.security.InvalidParameterException;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -30,7 +31,7 @@ public class ConfigureGameService {
         User creator = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Employee createdByEmployee = creator.getEmployee();
 
-        if(configureGameRepository.existsByGame_Id(createGameConfigurationDto.getGameId())){
+        if(configureGameRepository.existsByGame_IdAndIsActiveFalse(createGameConfigurationDto.getGameId())){
             throw new IllegalStateException("Game already configured");
         }
 
@@ -137,5 +138,23 @@ public class ConfigureGameService {
         gameConfigResponseDto.setGameName(configureGame.getGame().getGameName());
 
         return gameConfigResponseDto;
+    }
+
+    public void deleteGameConfiguration(Long configureGameId, Long userId) throws AccessDeniedException {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
+        if(!isHr) {
+            throw new AccessDeniedException("You are not allowed to access this resource");
+        }
+
+        ConfigureGame configureGame = configureGameRepository.findById(configureGameId).orElseThrow(() -> new ResourceNotFoundException("Game configuration does not exist"));
+        configureGame.setDeletedBy(user.getEmployee());
+        configureGame.setDeletedAt(Instant.now());
+        configureGame.setIsActive(false);
+        configureGameRepository.save(configureGame);
+
+
+
     }
 }

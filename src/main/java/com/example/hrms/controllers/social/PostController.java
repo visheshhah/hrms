@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ import java.util.List;
 public class PostController {
     private final PostService postService;
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/create")
     public ResponseEntity<Long> post(@RequestBody CreatePostDto createPostDto, @AuthenticationPrincipal MyUserDetails userDetails){
         Long userId = userDetails.getId();
@@ -35,6 +37,7 @@ public class PostController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping
     public ResponseEntity<List<PostResponseDto>> getPosts(
             @RequestParam(defaultValue = "0") int page,
@@ -56,6 +59,7 @@ public class PostController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PutMapping("/{postId}")
     public ResponseEntity<PostResponseDto> editPost(
             @PathVariable Long postId,
@@ -68,6 +72,7 @@ public class PostController {
         return ResponseEntity.ok(updatedPost);
     }
 
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping("/me")
     public ResponseEntity<List<PostResponseDto>> getMyPosts(
             @RequestParam(defaultValue = "0") int page,

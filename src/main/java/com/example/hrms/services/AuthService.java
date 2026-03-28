@@ -1,8 +1,12 @@
 package com.example.hrms.services;
 
 import com.example.hrms.dtos.AuthResponseDto;
+import com.example.hrms.dtos.CurrentUserResponseDto;
 import com.example.hrms.dtos.LoginDto;
 import com.example.hrms.dtos.SignUpDto;
+import com.example.hrms.dtos.role.EmployeeRoleResponseDto;
+import com.example.hrms.dtos.role.UpdateUserRoleDto;
+import com.example.hrms.dtos.role.UserRoleDetailResponseDto;
 import com.example.hrms.entities.Employee;
 import com.example.hrms.entities.Role;
 import com.example.hrms.entities.User;
@@ -14,15 +18,20 @@ import com.example.hrms.repositories.UserRepository;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
@@ -97,5 +106,96 @@ public class AuthService {
 //            throw  new BadCredentialsException("Bad Credentials + "+e.getMessage());
 //        }
 
+    }
+
+    @Transactional
+    public void updateUserRoles(UpdateUserRoleDto request, Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Set<Role> newRoles = request.getRoles().stream()
+                .map(roleEnum -> roleRepository.findByName(roleEnum)
+                        .orElseThrow(() -> new RuntimeException("Role not found: " + roleEnum)))
+                .collect(Collectors.toSet());
+
+        user.setRoles(newRoles);
+
+        userRepository.save(user);
+    }
+
+    public List<EmployeeRoleResponseDto> getEmployeeAndRoles(Long userId) {
+        User adminUser = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        boolean isAdmin = adminUser.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_ADMIN);
+        if(!isAdmin){
+            throw new AccessDeniedException("You are not allowed to perform this action");
+        }
+
+        List<User> users = userRepository.findAll();
+
+        return users.stream().map(user -> {
+
+            Employee employee = user.getEmployee();
+
+            EmployeeRoleResponseDto dto = new EmployeeRoleResponseDto();
+            dto.setId(user.getId());
+            dto.setFirstName(employee.getFirstName());
+            dto.setLastName(employee.getLastName());
+            dto.setDesignation(employee.getDesignation());
+            dto.setDepartment(employee.getDepartment().getDepartmentName());
+
+            Set<ERole> roles = user.getRoles().stream()
+                    .map(Role::getName)
+                    .collect(Collectors.toSet());
+
+            dto.setRoles(roles);
+
+            return dto;
+
+        }).collect(Collectors.toList());
+    }
+
+    public UserRoleDetailResponseDto getUserRoleDetails(Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Set<ERole> assignedRoles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        Set<ERole> allRoles = Arrays.stream(ERole.values())
+                .collect(Collectors.toSet());
+
+        UserRoleDetailResponseDto dto = new UserRoleDetailResponseDto();
+        dto.setUserId(user.getId());
+        dto.setName(user.getEmployee().getFirstName() + " " + user.getEmployee().getLastName());
+        dto.setAssignedRoles(assignedRoles);
+        dto.setAllRoles(allRoles);
+
+        return dto;
+    }
+
+    public CurrentUserResponseDto getCurrentUser(Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Employee employee = user.getEmployee();
+
+        CurrentUserResponseDto dto = new CurrentUserResponseDto();
+        dto.setUserId(user.getId());
+        dto.setEmployeeId(employee != null ? employee.getId() : null);
+        dto.setFirstName(employee.getFirstName());
+        dto.setLastName(employee.getLastName());
+        dto.setEmail(user.getEmail());
+
+        Set<ERole> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        dto.setRoles(roles);
+
+        return dto;
     }
 }

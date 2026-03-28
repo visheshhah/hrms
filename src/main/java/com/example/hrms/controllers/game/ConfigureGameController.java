@@ -41,4 +41,10 @@ public class ConfigureGameController {
     public ResponseEntity<GameConfigResponseDto> getGameConfigurationById(@PathVariable("configure-game-id") Long configureGameId, @AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
         return ResponseEntity.ok(configureGameService.getGameConfigurationById(configureGameId, userDetails.getId()));
     }
+
+    @DeleteMapping("/{configure-game-id}")
+    public ResponseEntity<Void> deleteGameConfiguration(@PathVariable("configure-game-id") Long configureGameId, @AuthenticationPrincipal MyUserDetails userDetails) throws AccessDeniedException {
+        configureGameService.deleteGameConfiguration(configureGameId, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
 }

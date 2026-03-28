@@ -113,7 +113,10 @@ public class SlotRegistrationService {
             return;
         }
 
-        SlotRegistration registration = slotRegistrationRepository.findByEmployeeAndSlot(bookedBy, gameSlot);
+        //SlotRegistration registration = slotRegistrationRepository.findByEmployeeAndSlot(bookedBy, gameSlot);
+        SlotRegistration registration = slotRegistrationRepository.findByEmployeeAndSlotAndStatusNot(
+                bookedBy, gameSlot, SlotRegistrationStatus.CANCELLED
+        );
         if(registration != null){
             if(registration.getStatus() == SlotRegistrationStatus.CANCELLED){
                 return;
@@ -204,7 +207,7 @@ public class SlotRegistrationService {
 
         private void ensureNotAlreadyRegistered(Employee employee, GameSlot slot) {
             boolean exists = slotRegistrationRepository
-                    .existsByEmployeeAndSlot(employee, slot);
+                    .existsByEmployeeAndSlotAndStatusNot(employee, slot, SlotRegistrationStatus.CANCELLED);
 
             if (exists) {
                 throw new IllegalArgumentException(
