@@ -45,46 +45,91 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final EmployeeRepository employeeRepository;
 
+
     public AuthResponseDto signUp(SignUpDto signUpDTO) {
-        if(userRepository.existsByUsername(signUpDTO.getUsername())){
-            throw new BadCredentialsException("Username is already in use");
+
+        if (userRepository.existsByUsername(signUpDTO.getUsername())) {
+            throw new RuntimeException("Username already exists");
         }
 
-        Employee employee = employeeRepository.findById(signUpDTO.getEmployeeId()).orElseThrow(()->new ResourceNotFoundException("Employee not found"));
+        Employee employee = employeeRepository.findById(signUpDTO.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
+        if (userRepository.existsByEmployee(employee)) {
+            throw new RuntimeException("User already exists for this employee");
+        }
 
         User user = User.builder()
                 .username(signUpDTO.getUsername())
-                .email(signUpDTO.getEmail())
+                .email(employee.getEmail())
                 .password(passwordEncoder.encode(signUpDTO.getPassword()))
                 .isActive(true)
                 .build();
 
         Set<Role> roles = new HashSet<>();
 
-        if(signUpDTO.getRoles() == null || signUpDTO.getRoles().isEmpty()){
-            roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE).orElseThrow(() -> new RuntimeException("Role Not Found")));
-        }
-        else {
+        if (signUpDTO.getRoles() == null || signUpDTO.getRoles().isEmpty()) {
+            roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE)
+                    .orElseThrow(() -> new RuntimeException("Role not found")));
+        } else {
             for (String role : signUpDTO.getRoles()) {
-                switch (role.toLowerCase()) {
-                    case "admin" -> roles.add(roleRepository.findByName(ERole.ROLE_ADMIN).orElseThrow());
-                    case "hr" -> roles.add(roleRepository.findByName(ERole.ROLE_HR).orElseThrow());
-                    case "manager" -> roles.add(roleRepository.findByName(ERole.ROLE_MANAGER).orElseThrow());
-                    case "reviewer" -> roles.add(roleRepository.findByName(ERole.ROLE_REVIEWER).orElseThrow());
-
-                    default -> roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE).orElseThrow());
-
-
+                try {
+                    ERole enumRole = ERole.valueOf("ROLE_" + role.toUpperCase());
+                    roles.add(roleRepository.findByName(enumRole)
+                            .orElseThrow(() -> new RuntimeException("Role not found: " + role)));
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException("Invalid role: " + role);
                 }
             }
         }
 
         user.setEmployee(employee);
         user.setRoles(roles);
+
         User savedUser = userRepository.save(user);
+
         return modelMapper.map(savedUser, AuthResponseDto.class);
     }
+//    public AuthResponseDto signUp(SignUpDto signUpDTO) {
+//        if(userRepository.existsByUsername(signUpDTO.getUsername())){
+//            throw new BadCredentialsException("Username is already in use");
+//        }
+//
+//        Employee employee = employeeRepository.findById(signUpDTO.getEmployeeId()).orElseThrow(()->new ResourceNotFoundException("Employee not found"));
+//
+//
+//        User user = User.builder()
+//                .username(signUpDTO.getUsername())
+//                .email(signUpDTO.getEmail())
+//                .password(passwordEncoder.encode(signUpDTO.getPassword()))
+//                .isActive(true)
+//                .build();
+//
+//        Set<Role> roles = new HashSet<>();
+//
+//        if(signUpDTO.getRoles() == null || signUpDTO.getRoles().isEmpty()){
+//            roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE).orElseThrow(() -> new RuntimeException("Role Not Found")));
+//        }
+//        else {
+//            for (String role : signUpDTO.getRoles()) {
+//                switch (role.toLowerCase()) {
+//                    case "admin" -> roles.add(roleRepository.findByName(ERole.ROLE_ADMIN).orElseThrow());
+//                    case "hr" -> roles.add(roleRepository.findByName(ERole.ROLE_HR).orElseThrow());
+//                    case "manager" -> roles.add(roleRepository.findByName(ERole.ROLE_MANAGER).orElseThrow());
+//                    case "reviewer" -> roles.add(roleRepository.findByName(ERole.ROLE_REVIEWER).orElseThrow());
+//
+//                    default -> roles.add(roleRepository.findByName(ERole.ROLE_EMPLOYEE).orElseThrow());
+//
+//
+//                }
+//            }
+//        }
+//
+//        user.setEmployee(employee);
+//        user.setRoles(roles);
+//        User savedUser = userRepository.save(user);
+//        return modelMapper.map(savedUser, AuthResponseDto.class);
+//    }
 
     public String login(LoginDto loginDTO) {
         // try{

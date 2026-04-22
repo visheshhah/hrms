@@ -3,6 +3,8 @@ package com.example.hrms.controllers.game;
 import com.example.hrms.dtos.game.GameSlotResponseDto;
 import com.example.hrms.dtos.game.RegisterSlotInterestDto;
 import com.example.hrms.dtos.game.SlotRegistrationResponseDto;
+import com.example.hrms.dtos.game.UserSlotStatusDto;
+import com.example.hrms.dtos.travel.EmployeeWithTravelDto;
 import com.example.hrms.entities.MyUserDetails;
 import com.example.hrms.services.game.SlotRegistrationService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -35,4 +38,22 @@ public class SlotRegistrationController {
         return new ResponseEntity<>(slotRegistrationService.getEmployeeRegistrations(userDetails.getId(), gameId), HttpStatus.OK);
     }
     //
+
+    @GetMapping("/{slotId}/my-status")
+    public ResponseEntity<UserSlotStatusDto> getMySlotStatus(
+            @PathVariable Long slotId,
+            @AuthenticationPrincipal MyUserDetails userDetails
+    ) {
+
+        UserSlotStatusDto response =
+                slotRegistrationService.getUserSlotStatus(userDetails.getId(), slotId);
+
+        return ResponseEntity.ok(response);
+    }
+//    @GetMapping("/{slotId}/employees")
+//    public ResponseEntity<List<EmployeeWithTravelDto>> getEmployeesForSlot(
+//            @PathVariable Long slotId) {
+//
+//        return ResponseEntity.ok(slotRegistrationService.getEmployeesForSlot(slotId));
+//    }
 }

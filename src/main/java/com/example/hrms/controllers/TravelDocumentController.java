@@ -1,6 +1,7 @@
 package com.example.hrms.controllers;
 
 import com.example.hrms.dtos.document.TravelDocumentResponseDto;
+import com.example.hrms.dtos.document.UpdateTravelDocumentRequestDto;
 import com.example.hrms.dtos.document.UploadTravelDocumentRequestDto;
 import com.example.hrms.dtos.expense.EmployeeExpenseResponseDto;
 import com.example.hrms.dtos.file.FileResponseDto;
@@ -64,5 +65,22 @@ public class TravelDocumentController {
     public ResponseEntity<List<TravelDocumentResponseDto>> getCommonTravelPlanDocument(@PathVariable("travel-plan-id") Long travelPlanId) {
         List<TravelDocumentResponseDto> employeeDocuments = travelDocumentService.findCommonDocumentByTravelPlanId(travelPlanId);
         return ResponseEntity.ok(employeeDocuments);
+    }
+
+    @DeleteMapping("/{travel-document-id}/delete")
+    public ResponseEntity<Void> deleteDocument(@PathVariable("travel-document-id") Long travelPlanId, @AuthenticationPrincipal MyUserDetails userDetails) {
+        travelDocumentService.deleteTravelDocument(travelPlanId, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping(value = "/{id}/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> updateTravelDocument(
+            @PathVariable Long id,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestPart("data") UpdateTravelDocumentRequestDto updateTravelDocumentRequestDto,
+            @AuthenticationPrincipal MyUserDetails userDetails
+    ) {
+        travelDocumentService.updateTravelDocument(id, file, updateTravelDocumentRequestDto, userDetails.getId());
+        return ResponseEntity.noContent().build();
     }
 }

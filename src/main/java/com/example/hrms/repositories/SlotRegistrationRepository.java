@@ -7,6 +7,7 @@ import com.example.hrms.enums.SlotRegistrationStatus;
 import org.aspectj.weaver.patterns.ConcreteCflowPointcut;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -69,4 +70,23 @@ public interface SlotRegistrationRepository extends JpaRepository<SlotRegistrati
        AND g.id = :gameId
     """)
     List<SlotRegistration> findActiveRegistrartionForToday(Employee employee, LocalDate today, Long gameId);
+
+    @Query("""
+    SELECT COUNT(sr)
+    FROM SlotRegistration sr
+    WHERE sr.employee.id = :employeeId
+      AND sr.slot.slotDate = :slotDate
+      AND sr.status IN :statuses
+""")
+    long countByEmployeeAndDateAndStatusIn(
+            @Param("employeeId") Long employeeId,
+            @Param("slotDate") LocalDate slotDate,
+            @Param("statuses") List<SlotRegistrationStatus> statuses
+    );
+
+    boolean existsByEmployeeAndSlotAndStatusIn(
+            Employee employee,
+            GameSlot slot,
+            List<SlotRegistrationStatus> statuses
+    );
 }

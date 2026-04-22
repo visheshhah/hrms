@@ -32,4 +32,8 @@ public class SlotRegistration {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SlotRegistrationStatus status = SlotRegistrationStatus.PENDING;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booked_by_id", nullable = false)
+    private Employee bookedBy;
 }

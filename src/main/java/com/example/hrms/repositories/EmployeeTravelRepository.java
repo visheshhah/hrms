@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -44,5 +45,15 @@ public interface EmployeeTravelRepository extends JpaRepository<EmployeeTravel, 
 """
     )
     List<EmployeeTravel> findExistingTravels(Employee employee);
+
+    @Query("""
+    SELECT COUNT(et) > 0
+    FROM EmployeeTravel et
+    WHERE et.employee.id = :employeeId
+      AND et.travelPlan.status = com.example.hrms.enums.TravelStatus.ACTIVE
+      AND et.travelPlan.startDate <= :slotDate
+      AND et.travelPlan.endDate >= :slotDate
+""")
+    boolean existsTravelConflict(Long employeeId, LocalDate slotDate);
 }
 

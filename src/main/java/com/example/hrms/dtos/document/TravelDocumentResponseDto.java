@@ -16,5 +16,6 @@ public class TravelDocumentResponseDto {
     private String fileName;
     private String uploadedByName;
     private EOwnerType uploadedByRole;
+    private Long documentTypeId;
     //private Instant uploadedAt;
 }

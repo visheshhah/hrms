@@ -107,4 +107,8 @@ public class EmployeeController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/available-employees")
+    public ResponseEntity<List<EmployeeDetailResponseDto>> getAvailableEmployees() {
+        return new ResponseEntity<>(employeeService.getAvailableEmployees(),  HttpStatus.OK);
+    }
 }

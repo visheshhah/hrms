@@ -17,6 +17,8 @@ public class Department {
     @Column(unique = true, nullable = false)
     private String departmentName;
 
+    private Boolean isActive = Boolean.TRUE;
+
     @OneToMany(mappedBy = "department")
     private List<Employee> employee;
 }

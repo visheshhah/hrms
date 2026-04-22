@@ -25,4 +25,8 @@ public class JobDetailDto {
     private String workPlaceType;
 
     private Set<Long> reviewerIds;
+
+    private Long jdId;
+
+    private String fileName;
 }

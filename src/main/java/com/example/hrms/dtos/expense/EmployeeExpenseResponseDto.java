@@ -20,6 +20,6 @@ public class EmployeeExpenseResponseDto {
     private ExpenseStatus expenseStatus;
     private BigDecimal amount;
     private String description;
-
+    private Long categoryId;
     private List<ExpenseProofDto> proofs;
 }

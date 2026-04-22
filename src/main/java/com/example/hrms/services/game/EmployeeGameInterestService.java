@@ -5,11 +5,9 @@ import com.example.hrms.dtos.game.GameTabDto;
 import com.example.hrms.dtos.game.UpdateEmployeeGameInterestDto;
 import com.example.hrms.dtos.travel.EmployeeDto;
 import com.example.hrms.entities.*;
+import com.example.hrms.enums.SlotRegistrationStatus;
 import com.example.hrms.exceptions.ResourceNotFoundException;
-import com.example.hrms.repositories.EmployeeGameInterestRepository;
-import com.example.hrms.repositories.GameRepository;
-import com.example.hrms.repositories.GameSlotRepository;
-import com.example.hrms.repositories.UserRepository;
+import com.example.hrms.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -29,6 +27,9 @@ public class EmployeeGameInterestService {
     private final GameRepository gameRepository;
     private final GameSlotRepository gameslotRepository;
     private final ModelMapper modelMapper;
+    private final EmployeeTravelRepository employeeTravelRepository;
+    private final SlotRegistrationRepository slotRegistrationRepository;
+    private static final int MAX_DAILY_BOOKINGS = 3;
 
     public void updateEmployeeGameInterest(Long userId, UpdateEmployeeGameInterestDto dto)
     {
@@ -93,7 +94,39 @@ public class EmployeeGameInterestService {
                 .filter(e -> !e.getId().equals(employee.getId()))
                 .toList();
         return employees.stream()
-                .map(e -> modelMapper.map(e, EmployeeDto.class))
+                .map(e -> {
+                    EmployeeDto dto = modelMapper.map(e, EmployeeDto.class);
+
+                    boolean isOnTravel = employeeTravelRepository
+                            .existsTravelConflict(e.getId(), gameSlot.getSlotDate());
+
+                    dto.setIsOnTravel(isOnTravel);
+                    long activeRequests = slotRegistrationRepository
+                            .countByEmployeeAndDateAndStatusIn(
+                                    e.getId(),
+                                    gameSlot.getSlotDate(),
+                                    List.of(
+                                            SlotRegistrationStatus.PENDING,
+                                            SlotRegistrationStatus.CONFIRMED
+                                    )
+                            );
+
+                    boolean isLimitReached = activeRequests >= MAX_DAILY_BOOKINGS;
+
+                    dto.setIsLimitReached(isLimitReached);
+
+                    boolean isAlreadyRegistered = slotRegistrationRepository
+                            .existsByEmployeeAndSlotAndStatusIn(
+                                    e,
+                                    gameSlot,
+                                    List.of(
+                                            SlotRegistrationStatus.PENDING,
+                                            SlotRegistrationStatus.CONFIRMED
+                                    )
+                            );
+                    dto.setIsAlreadyRegistered(isAlreadyRegistered);
+                    return dto;
+                })
                 .toList();
     }
 

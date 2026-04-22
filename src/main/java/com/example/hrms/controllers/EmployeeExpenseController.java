@@ -5,6 +5,7 @@ import com.example.hrms.dtos.expense.SubmitExpenseDto;
 import com.example.hrms.dtos.file.FileResponseDto;
 import com.example.hrms.entities.MyUserDetails;
 import com.example.hrms.services.expense.EmployeeExpenseService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -70,5 +71,31 @@ public class EmployeeExpenseController {
     public ResponseEntity<List<EmployeeExpenseResponseDto>> getEmployeeExpenseByStatus(@PathVariable("travel-plan-id") Long travelPlanId, @PathVariable("employee-id")  Long employeeId, @RequestParam(defaultValue = "submitted") String status) {
         List<EmployeeExpenseResponseDto> employeeExpenses = employeeExpenseService.findAllExpenseByStatus(employeeId, travelPlanId, status);
         return ResponseEntity.ok(employeeExpenses);
+    }
+
+    @DeleteMapping("/{expenseId}/delete")
+    public ResponseEntity<Void> deleteExpense(
+            @PathVariable Long expenseId,
+            @AuthenticationPrincipal MyUserDetails userDetails
+    ) {
+        employeeExpenseService.deleteExpense(expenseId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping(value = "/{expenseId}/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> updateExpense(
+            @PathVariable Long expenseId,
+            @RequestPart("data") @Valid SubmitExpenseDto dto,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @AuthenticationPrincipal MyUserDetails userDetails
+    ) {
+        employeeExpenseService.updateExpense(
+                expenseId,
+                dto,
+                userDetails.getId(),
+                file
+        );
+
+        return ResponseEntity.noContent().build();
     }
 }

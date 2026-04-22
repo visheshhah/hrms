@@ -256,4 +256,26 @@ public class EmployeeService {
 
         employeeRepository.save(employee);
     }
+
+    public List<EmployeeDetailResponseDto> getAvailableEmployees() {
+        List<Employee> employees = employeeRepository.findAvailableEmployees();
+
+        return employees.stream()
+                .map(employee -> {
+                    EmployeeDetailResponseDto employeeDetailResponseDto = new EmployeeDetailResponseDto();
+                    employeeDetailResponseDto.setId(employee.getId());
+                    employeeDetailResponseDto.setFullName(employee.getFirstName() + " " + employee.getLastName());
+                    employeeDetailResponseDto.setEmail(employee.getEmail());
+                    employeeDetailResponseDto.setJoiningDate(employee.getJoiningDate());
+                    employeeDetailResponseDto.setDesignation(employee.getDesignation());
+                    employeeDetailResponseDto.setPhoneNumber(employee.getPhoneNumber());
+                    employeeDetailResponseDto.setDepartmentName(employee.getDepartment().getDepartmentName());
+                    employeeDetailResponseDto.setDateOfBirth(employee.getDateOfBirth());
+                    if(employee.getManager() != null){
+                        employeeDetailResponseDto.setManagerName(employee.getManager().getFirstName() + " " + employee.getManager().getLastName());
+                    }
+                    return employeeDetailResponseDto;
+                }).toList();
+    }
+
 }

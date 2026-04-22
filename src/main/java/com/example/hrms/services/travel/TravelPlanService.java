@@ -7,7 +7,9 @@ import com.example.hrms.enums.ERole;
 import com.example.hrms.enums.NotificationType;
 import com.example.hrms.enums.ReferenceType;
 import com.example.hrms.enums.TravelStatus;
+import com.example.hrms.exceptions.EmployeeTravelConflictException;
 import com.example.hrms.exceptions.ResourceNotFoundException;
+import com.example.hrms.exceptions.TravelConflictException;
 import com.example.hrms.repositories.EmployeeRepository;
 import com.example.hrms.repositories.EmployeeTravelRepository;
 import com.example.hrms.repositories.TravelPlanRepository;
@@ -50,6 +52,10 @@ public class TravelPlanService {
             throw new IllegalArgumentException("Start date should be after end date");
         }
 
+        if (travelPlanDto.getEmployees() == null || travelPlanDto.getEmployees().isEmpty()) {
+            throw new IllegalArgumentException("At least one employee is required");
+        }
+
         TravelPlan travelPlanEntity = new TravelPlan();
         List<EmployeeTravel> participants = new ArrayList<>();
 
@@ -67,8 +73,24 @@ public class TravelPlanService {
         LocalDate endDate = travelPlanDto.getEndDate();
         List<Employee> employees = new ArrayList<>();
 
+        Set<Long> processedEmployeeIds = new HashSet<>();
+        List<EmployeeConflictDto> allConflicts = new ArrayList<>();
+
         for(EmployeeTravelDto employee: travelPlanDto.getEmployees()) {
             Employee employeeEntity = employeeRepository.findById(employee.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("EMPLOYEE NOT FOUND"));
+
+            if (!processedEmployeeIds.add(employeeEntity.getId())) {
+                continue;
+            }
+
+            List<EmployeeConflictDto> conflicts =
+                    getConflicts(startDate, endDate, employeeEntity, null);
+
+            if (!conflicts.isEmpty()) {
+                allConflicts.addAll(conflicts);
+                continue;
+            }
+
             EmployeeTravel employeeTravelEntity = new EmployeeTravel();
             employeeTravelEntity.setEmployee(employeeEntity);
             validateTravelConflict(travelPlanDto.getStartDate(), travelPlanDto.getEndDate(), employeeEntity, null);
@@ -76,6 +98,11 @@ public class TravelPlanService {
             employees.add(employeeEntity);
             participants.add(employeeTravelEntity);
         }
+
+        if (!allConflicts.isEmpty()) {
+            throw new EmployeeTravelConflictException(allConflicts);
+        }
+
         travelPlanEntity.setEmployeeTravels(participants);
 
         travelPlanEntity = travelPlanRepository.save(travelPlanEntity);
@@ -144,16 +171,15 @@ public class TravelPlanService {
         employeeRepository.findById(creatorId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
 
-        if(!travelPlanDto.getTitle().isEmpty()) {
-            travelPlanEntity.setTitle(travelPlanDto.getTitle());
+        if (travelPlanDto.getTitle() != null && !travelPlanDto.getTitle().isEmpty()){            travelPlanEntity.setTitle(travelPlanDto.getTitle());
         }
-        if(!travelPlanDto.getDescription().isEmpty()) {
+        if(travelPlanDto.getDescription() != null && !travelPlanDto.getDescription().isEmpty()) {
             travelPlanEntity.setDescription(travelPlanDto.getDescription());
         }
-        if(!travelPlanDto.getSourceLocation().isEmpty()) {
+        if(travelPlanDto.getSourceLocation() != null && !travelPlanDto.getSourceLocation().isEmpty()) {
             travelPlanEntity.setSourceLocation(travelPlanDto.getSourceLocation());
         }
-        if(!travelPlanDto.getDestinationLocation().isEmpty()) {
+        if(travelPlanDto.getDestinationLocation() != null && !travelPlanDto.getDestinationLocation().isEmpty()) {
             travelPlanEntity.setDestinationLocation(travelPlanDto.getDestinationLocation());
         }
 
@@ -181,18 +207,8 @@ public class TravelPlanService {
 
         boolean isDateChanged = travelPlanDto.getStartDate() != null || travelPlanDto.getEndDate() != null;
 
-        if (isDateChanged) {
-            for (EmployeeTravel et : travelPlanEntity.getEmployeeTravels()) {
-                validateTravelConflict(
-                        travelPlanEntity.getStartDate(),
-                        travelPlanEntity.getEndDate(),
-                        et.getEmployee(),
-                        travelPlanEntity.getId()
-                );
-            }
-        }
-
-        if(!travelPlanDto.getIsInternational().equals(travelPlanEntity.getIsInternational())) {
+        if (travelPlanDto.getIsInternational() != null &&
+                !travelPlanDto.getIsInternational().equals(travelPlanEntity.getIsInternational())) {
             travelPlanEntity.setIsInternational(travelPlanDto.getIsInternational());
         }
 
@@ -200,7 +216,7 @@ public class TravelPlanService {
 
         Set<Long> existingEmployeeIds = existingEmployees.stream().map(employeeTravel -> employeeTravel.getEmployee().getId()).collect(Collectors.toSet());
         Set<Long> newEmployeeIds = travelPlanDto.getEmployeeIds() == null
-                ? Set.of()
+                ? existingEmployeeIds
                 : new HashSet<>(travelPlanDto.getEmployeeIds());
 
         Set<Long> toAdd = new HashSet<>(newEmployeeIds);
@@ -208,6 +224,45 @@ public class TravelPlanService {
 
         Set<Long> toRemove = new HashSet<>(existingEmployeeIds);
         toRemove.removeAll(newEmployeeIds);
+
+        List<EmployeeConflictDto> allConflicts = new ArrayList<>();
+
+        if (isDateChanged) {
+            for (EmployeeTravel et : existingEmployees) {
+
+                List<EmployeeConflictDto> conflicts = getConflicts(
+                        travelPlanEntity.getStartDate(),
+                        travelPlanEntity.getEndDate(),
+                        et.getEmployee(),
+                        travelPlanEntity.getId()
+                );
+
+                if (!conflicts.isEmpty()) {
+                    allConflicts.addAll(conflicts);
+                }
+            }
+        }
+
+        if (!toAdd.isEmpty()) {
+            List<Employee> employeesToAdd = employeeRepository.findAllById(toAdd);
+
+            for (Employee employee : employeesToAdd) {
+                List<EmployeeConflictDto> conflicts = getConflicts(
+                        travelPlanEntity.getStartDate(),
+                        travelPlanEntity.getEndDate(),
+                        employee,
+                        travelPlanEntity.getId()
+                );
+
+                if (!conflicts.isEmpty()) {
+                    allConflicts.addAll(conflicts);
+                }
+            }
+        }
+
+        if (!allConflicts.isEmpty()) {
+            throw new EmployeeTravelConflictException(allConflicts);
+        }
 
         if (!toRemove.isEmpty()) {
             employeeTravelRepository.deleteByTravelPlanAndEmployeeIdIn(travelPlanEntity, toRemove);
@@ -217,20 +272,12 @@ public class TravelPlanService {
             List<Employee> employeesToAdd = employeeRepository.findAllById(toAdd);
 
             for (Employee employee : employeesToAdd) {
-                validateTravelConflict(
-                        travelPlanEntity.getStartDate(),
-                        travelPlanEntity.getEndDate(),
-                        employee,
-                        travelPlanEntity.getId()
-                );
-
                 EmployeeTravel employeeTravel = new EmployeeTravel();
                 employeeTravel.setEmployee(employee);
                 employeeTravel.setTravelPlan(travelPlanEntity);
                 employeeTravelRepository.save(employeeTravel);
             }
         }
-
 
         travelPlanEntity = travelPlanRepository.save(travelPlanEntity);
         return modelMapper.map(travelPlanEntity, TravelPlanResponseDto.class);
@@ -457,6 +504,47 @@ public class TravelPlanService {
         return travelPlans.stream()
                 .map(travelPlan -> modelMapper.map(travelPlan, TravelPlanResponseDto.class))
                 .toList();
+    }
+
+    private List<EmployeeConflictDto> getConflicts(
+            LocalDate startDate,
+            LocalDate endDate,
+            Employee employee,
+            Long currentTravelPlanId
+    ) {
+        List<EmployeeConflictDto> conflicts = new ArrayList<>();
+
+        List<EmployeeTravel> employeeTravels =
+                employeeTravelRepository.findExistingTravels(employee);
+
+        for (EmployeeTravel et : employeeTravels) {
+
+            if (currentTravelPlanId != null &&
+                    et.getTravelPlan().getId().equals(currentTravelPlanId)) {
+                continue;
+            }
+
+            LocalDate travelStart = et.getTravelPlan().getStartDate();
+            LocalDate travelEnd = et.getTravelPlan().getEndDate();
+
+            boolean isConflict =
+                    !travelEnd.isBefore(startDate) &&
+                            !travelStart.isAfter(endDate);
+
+            if (isConflict) {
+
+                conflicts.add(new EmployeeConflictDto(
+                        employee.getId(),
+                        employee.getFirstName() + " " + employee.getLastName(),
+                        travelStart,
+                        travelEnd
+                ));
+
+                break;
+            }
+        }
+
+        return conflicts;
     }
 }
 //public List<TravelPlanResponseDto> getTravelPlansByEmployeeId(Long userId, String status){

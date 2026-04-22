@@ -37,7 +37,7 @@ public class WebSecurityConfig {
 
     private final String[] publicRoutes = {
             "/post",
-            "/auth/signup/**",
+            //"/auth/signup/**",
             "/auth/login/**",
             "/error",
             "/v1/api/**",

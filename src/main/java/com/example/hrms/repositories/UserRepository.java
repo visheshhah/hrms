@@ -1,5 +1,6 @@
 package com.example.hrms.repositories;
 
+import com.example.hrms.entities.Employee;
 import com.example.hrms.entities.Role;
 import com.example.hrms.entities.User;
 import com.example.hrms.enums.ERole;
@@ -20,4 +21,6 @@ public interface UserRepository extends JpaRepository<User,Long> {
     Boolean existsByUsername(String username);
 
     List<User> findAllByRolesName(ERole roleName);
+
+    boolean existsByEmployee(Employee employee);
 }

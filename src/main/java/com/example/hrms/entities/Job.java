@@ -60,6 +60,7 @@ public class Job {
     @OneToMany(mappedBy = "job")
     List<JobCvReviewer> jobCvReviewers;
 
-
+    @OneToMany(mappedBy = "job", cascade = CascadeType.ALL)
+    private List<JobDocument> documents;
 
 }

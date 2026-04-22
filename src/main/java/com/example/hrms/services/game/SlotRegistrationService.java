@@ -3,10 +3,14 @@ package com.example.hrms.services.game;
 import com.example.hrms.dtos.game.GameSlotResponseDto;
 import com.example.hrms.dtos.game.RegisterSlotInterestDto;
 import com.example.hrms.dtos.game.SlotRegistrationResponseDto;
+import com.example.hrms.dtos.game.UserSlotStatusDto;
+import com.example.hrms.dtos.travel.EmployeeWithTravelDto;
 import com.example.hrms.entities.*;
 import com.example.hrms.enums.SlotBookingStatus;
 import com.example.hrms.enums.SlotRegistrationStatus;
+import com.example.hrms.exceptions.DailyLimitExceededException;
 import com.example.hrms.exceptions.ResourceNotFoundException;
+import com.example.hrms.exceptions.TravelConflictException;
 import com.example.hrms.repositories.*;
 import com.example.hrms.services.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +37,8 @@ public class SlotRegistrationService {
     private final EmployeeGameInterestRepository employeeGameInterestRepository;
     private final SlotBookingRepository slotBookingRepository;
     private final NotificationService notificationService;
-
+    private final EmployeeTravelRepository employeeTravelRepository;
+    private static final int MAX_DAILY_BOOKINGS = 3;
 
     public void registerInterest(Long slotId,
                                      Long bookedByUserId,
@@ -61,13 +65,68 @@ public class SlotRegistrationService {
                 employeeIds.addAll(dto.getEmployeeIds());
             }
 
+        Map<Long, Employee> employeeMap = employeeRepository
+                .findAllById(employeeIds)
+                .stream()
+                .collect(Collectors.toMap(Employee::getId, Function.identity()));
+
             LocalDate weekStart = LocalDate.now()
                     .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
+            List<Employee> conflictingEmployees = new ArrayList<>();
             for (Long employeeId : employeeIds) {
 
-                Employee employee = employeeRepository.findById(employeeId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+                Employee employee = employeeMap.get(employeeId);
+                if (employee == null) {
+                    throw new ResourceNotFoundException("Employee not found");
+                }
+
+                boolean isOnTravel = employeeTravelRepository
+                        .existsTravelConflict(employee.getId(), slot.getSlotDate());
+
+                if (isOnTravel) {
+                    conflictingEmployees.add(employee);
+                }
+            }
+
+        if (!conflictingEmployees.isEmpty()) {
+            throw new TravelConflictException(conflictingEmployees);
+        }
+
+        List<Employee> limitExceededEmployees = new ArrayList<>();
+
+        for (Long employeeId : employeeIds) {
+
+            Employee employee = employeeMap.get(employeeId);
+            if (employee == null) {
+                throw new ResourceNotFoundException("Employee not found");
+            }
+
+            long activeRequests = slotRegistrationRepository
+                    .countByEmployeeAndDateAndStatusIn(
+                            employee.getId(),
+                            slot.getSlotDate(),
+                            List.of(
+                                    SlotRegistrationStatus.PENDING,
+                                    SlotRegistrationStatus.CONFIRMED
+                            )
+                    );
+
+            if (activeRequests >= MAX_DAILY_BOOKINGS) {
+                limitExceededEmployees.add(employee);
+            }
+        }
+
+        if (!limitExceededEmployees.isEmpty()) {
+            throw new DailyLimitExceededException(limitExceededEmployees);
+        }
+
+            for (Long employeeId : employeeIds) {
+
+                Employee employee = employeeMap.get(employeeId);
+                if (employee == null) {
+                    throw new ResourceNotFoundException("Employee not found");
+                }
 
                 ensureEmployeeInterested(employee, slot.getGame());
 
@@ -85,7 +144,7 @@ public class SlotRegistrationService {
                 registration.setSlot(slot);
                 registration.setSlotCountAtRequest(weeklySlotCount.getSlotCount());
                 registration.setStatus(SlotRegistrationStatus.PENDING);
-
+                registration.setBookedBy(bookedBy);
                 slotRegistrationRepository.save(registration);
                 notificationService.notifyRegistrationMade(bookedBy, employee, slot);
             }
@@ -173,16 +232,25 @@ public class SlotRegistrationService {
         );
 
         return slotRegistrations.stream()
-                .map(this::mapToDto)
+                .map(reg -> mapToDto(reg, employee))
                 .toList();
     }
 
-    private SlotRegistrationResponseDto mapToDto(SlotRegistration registration) {
+    private SlotRegistrationResponseDto mapToDto(SlotRegistration registration, Employee currentEmployee) {
 
         GameSlot slot = registration.getSlot();
 
         SlotRegistrationResponseDto dto =
                 new SlotRegistrationResponseDto();
+
+        Employee bookedBy = registration.getBookedBy();
+        String bookedByName;
+
+        if (bookedBy.getId().equals(currentEmployee.getId())) {
+            bookedByName = "You";
+        } else {
+            bookedByName = bookedBy.getFirstName() + " " + bookedBy.getLastName();
+        }
 
         dto.setSlotRegistrationId(registration.getId());
         dto.setSlotId(slot.getId());
@@ -191,7 +259,8 @@ public class SlotRegistrationService {
         dto.setEndTime(slot.getEndTime());
         dto.setMaxPlayers(slot.getMaxPlayers());
         dto.setGameName(slot.getGame().getGameName());
-
+        dto.setBookedBy(bookedByName);
+        dto.setBookedById(bookedBy.getId());
         return dto;
     }
     //
@@ -260,6 +329,66 @@ public class SlotRegistrationService {
             }
         }
 
+    public UserSlotStatusDto getUserSlotStatus(Long userId, Long slotId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Employee employee = user.getEmployee();
+
+        GameSlot slot = gameSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot not found"));
+
+        // ✅ Travel check
+        boolean isOnTravel = employeeTravelRepository
+                .existsTravelConflict(employee.getId(), slot.getSlotDate());
+
+        // ✅ Limit check
+        long activeRequests = slotRegistrationRepository
+                .countByEmployeeAndDateAndStatusIn(
+                        employee.getId(),
+                        slot.getSlotDate(),
+                        List.of(
+                                SlotRegistrationStatus.PENDING,
+                                SlotRegistrationStatus.CONFIRMED
+                        )
+                );
+
+        boolean isLimitReached = activeRequests >= MAX_DAILY_BOOKINGS;
+
+        boolean isRegistered = slotRegistrationRepository
+                .existsByEmployeeAndSlotAndStatusIn(
+                        employee,
+                        slot,
+                        List.of(
+                                SlotRegistrationStatus.PENDING,
+                                SlotRegistrationStatus.CONFIRMED
+                        )
+                );
+
+        return new UserSlotStatusDto(isOnTravel, isLimitReached, isRegistered);
+    }
+
+//    public Boolean isCurrentUserOnTravel(Long userId, Long slotId) {
+//
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+//
+//        Employee employee = user.getEmployee();
+//
+//        GameSlot slot = gameSlotRepository.findById(slotId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Slot not found"));
+//
+//        return employeeTravelRepository
+//                .existsTravelConflict(employee.getId(), slot.getSlotDate());
+//    }
+//    public List<EmployeeWithTravelDto> getEmployeesForSlot(Long slotId) {
+//
+//        GameSlot slot = gameSlotRepository.findById(slotId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Slot not found"));
+//
+//        return employeeRepository.findEmployeesWithTravelStatus(slot.getSlotDate());
+//    }
 
         //
     }

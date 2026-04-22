@@ -75,4 +75,6 @@ public interface SlotBookingRepository extends JpaRepository<SlotBooking, Long> 
 """)
     List<SlotBooking> findByEmployeeAndDate(Employee employee, LocalDate date);
 
+    @Query("SELECT sb FROM SlotBooking sb JOIN FETCH sb.employee WHERE sb.gameSlot.id = :slotId")
+    List<SlotBooking> findByGameSlotId(Long slotId);
 }

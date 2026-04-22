@@ -22,7 +22,7 @@ public class SlotGenerationScheduler {
     private final GameRepository gameRepository;
 
     //@Scheduled(cron = "0 0 0 * * *")
-    @Scheduled(cron = "0 */1 * * * ?")
+    //@Scheduled(cron = "0 */1 * * * ?")
     @Transactional
     public void generateSlots() {
 

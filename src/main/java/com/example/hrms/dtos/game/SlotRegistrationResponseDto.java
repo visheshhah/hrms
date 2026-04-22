@@ -16,4 +16,6 @@ public class SlotRegistrationResponseDto {
     private LocalTime endTime;
     private Integer maxPlayers;
     private String gameName;
+    private String bookedBy;
+    private Long bookedById;
 }

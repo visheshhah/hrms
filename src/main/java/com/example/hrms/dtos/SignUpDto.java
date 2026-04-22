@@ -13,8 +13,8 @@ public class SignUpDto{
         @NotBlank(message = "Please enter username")
         String username;
 
-        @Email(message = "Invalid email format")
-        String email;
+//        @Email(message = "Invalid email format")
+//        String email;
 
         @NotBlank(message = "Please enter password")
         String password;

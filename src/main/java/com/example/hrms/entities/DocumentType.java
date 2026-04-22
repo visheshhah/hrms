@@ -6,10 +6,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
-public class DocumentType {
+public class DocumentType extends BaseClass {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,11 +23,13 @@ public class DocumentType {
     @Column(unique = true, nullable = false)
     private String name;
 
-//    @Column(nullable = false)
-//    private Boolean isMandatory;
-
-    private Boolean isActive = Boolean.TRUE;
-
+    private Boolean isActive = true;
 
     private String allowedFormats = "PDF,JPG,PNG";
+
+    @ManyToOne
+    @JoinColumn(name = "deleted_by_id")
+    private Employee deletedBy;
+
+    private Instant deletedAt;
 }

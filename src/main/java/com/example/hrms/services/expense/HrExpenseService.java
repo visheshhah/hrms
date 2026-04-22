@@ -129,7 +129,7 @@ public class HrExpenseService {
         dto.setExpenseStatus(expense.getStatus());
         dto.setAmount(expense.getAmount());
         dto.setDescription(expense.getDescription());
-
+        dto.setCategoryId(expense.getCategory().getId());
         List<ExpenseProofDto> proofDtos = expense.getProofs()
                 .stream()
                 .map(proof -> {

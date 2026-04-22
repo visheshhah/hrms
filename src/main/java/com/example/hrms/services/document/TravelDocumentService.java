@@ -1,6 +1,7 @@
 package com.example.hrms.services.document;
 
 import com.example.hrms.dtos.document.TravelDocumentResponseDto;
+import com.example.hrms.dtos.document.UpdateTravelDocumentRequestDto;
 import com.example.hrms.dtos.document.UploadTravelDocumentRequestDto;
 import com.example.hrms.dtos.expense.EmployeeExpenseResponseDto;
 import com.example.hrms.dtos.file.FileResponseDto;
@@ -11,6 +12,7 @@ import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
 import com.example.hrms.services.files.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -25,8 +27,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TravelDocumentService {
     private final TravelDocumentRepository travelDocumentRepository;
@@ -130,6 +134,7 @@ public class TravelDocumentService {
                     travelDocumentResponseDto.setFileName(travelDocument.getFileName());
                     travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
                     travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
+                    travelDocumentResponseDto.setDocumentTypeId(travelDocument.getDocumentType().getId());
 
                     return  travelDocumentResponseDto;
                 })
@@ -177,7 +182,7 @@ public class TravelDocumentService {
                     travelDocumentResponseDto.setFileName(travelDocument.getFileName());
                     travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
                     travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
-
+                    travelDocumentResponseDto.setDocumentTypeId(travelDocument.getDocumentType().getId());
                     return  travelDocumentResponseDto;
                 })
                 .toList();
@@ -201,6 +206,7 @@ public class TravelDocumentService {
                     travelDocumentResponseDto.setFileName(travelDocument.getFileName());
                     travelDocumentResponseDto.setUploadedByName(travelDocument.getUploadedBy().getFirstName() + " " + travelDocument.getUploadedBy().getLastName());
                     travelDocumentResponseDto.setUploadedByRole(travelDocument.getOwnerType());
+                    travelDocumentResponseDto.setDocumentTypeId(travelDocument.getDocumentType().getId());
 
                     return  travelDocumentResponseDto;
                 })
@@ -222,34 +228,227 @@ public class TravelDocumentService {
 
     }
 
+    @Transactional
+    public void updateTravelDocument(Long travelDocumentId, MultipartFile file, UpdateTravelDocumentRequestDto dto, Long userId) {
+
+        // 1️⃣ Fetch user
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("USER NOT FOUND"));
+
+        // 2️⃣ Fetch document
+        TravelDocument travelDocument = travelDocumentRepository.findById(travelDocumentId)
+                .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT NOT FOUND"));
+
+        TravelPlan travelPlan = travelDocument.getTravelPlan();
+
+        // 3️⃣ Validate travel plan status
+        if (Boolean.FALSE.equals(travelPlan.getIsActive())) {
+            throw new IllegalStateException("Travel Plan has been deleted.");
+        }
+
+        // 4️⃣ Validate business rules
+        validateDeletionTime(travelPlan);
+        validateRoleBeforeDeletion(user, travelDocument);
+
+        // ✅ 5️⃣ FILE IS NOW OPTIONAL
+        if (file != null && !file.isEmpty()) {
+
+            String oldFilePath = travelDocument.getFilePath();
+
+            // 6️⃣ Store new file
+            String newFilePath = fileStorageService.store(file, "travel-documents");
+
+            try {
+                // 7️⃣ Update file fields
+                travelDocument.setFileName(
+                        Optional.ofNullable(file.getOriginalFilename()).orElse("unknown")
+                );
+                travelDocument.setFilePath(newFilePath);
+                travelDocument.setUploadedAt(Instant.now());
+
+                // 8️⃣ Delete old file safely
+                if (oldFilePath != null) {
+                    try {
+                        fileStorageService.delete("travel-documents", oldFilePath);
+                    } catch (Exception ex) {
+                        log.warn("Failed to delete old travel document {}", oldFilePath, ex);
+                    }
+                }
+
+            } catch (Exception e) {
+                // rollback file if DB fails
+                fileStorageService.delete("travel-documents", newFilePath);
+                throw e;
+            }
+        }
+
+        // ✅ 9️⃣ Update document type (optional)
+        if (dto.getDocumentTypeId() != null) {
+            DocumentType documentType = documentTypeRepository.findById(dto.getDocumentTypeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Document type not found"));
+
+            travelDocument.setDocumentType(documentType);
+        }
+
+        // ✅ 🔥 SAVE AT END (important fix)
+        travelDocumentRepository.save(travelDocument);
+    }
+
+//    @Transactional
+//    public void updateTravelDocument(Long travelDocumentId, MultipartFile file, UpdateTravelDocumentRequestDto dto, Long userId) {
+//
+//        // 1️⃣ Fetch user
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new ResourceNotFoundException("USER NOT FOUND"));
+//
+//        // 2️⃣ Fetch document
+//        TravelDocument travelDocument = travelDocumentRepository.findById(travelDocumentId)
+//                .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT NOT FOUND"));
+//
+//        TravelPlan travelPlan = travelDocument.getTravelPlan();
+//
+//        // 3️⃣ Validate travel plan status
+//        if (Boolean.FALSE.equals(travelPlan.getIsActive())) {
+//            throw new IllegalStateException("Travel Plan has been deleted.");
+//        }
+//
+//        // 4️⃣ Validate business rules
+//        validateDeletionTime(travelPlan); // reuse if same logic applies
+//        validateRoleBeforeDeletion(user, travelDocument);
+//
+//        // 5️⃣ Validate file
+//        validateFilePresence(file);
+//
+//        String oldFilePath = travelDocument.getFilePath();
+//
+//        // 6️⃣ Store new file
+//        String newFilePath = fileStorageService.store(file, "travel-documents");
+//
+//        try {
+//            // 7️⃣ Update DB
+//            travelDocument.setFileName(
+//                    Optional.ofNullable(file.getOriginalFilename()).orElse("unknown")
+//            );
+//            travelDocument.setFilePath(newFilePath);
+//            travelDocument.setUploadedAt(Instant.now());
+//
+//            travelDocumentRepository.save(travelDocument);
+//
+//        } catch (Exception e) {
+//            // rollback file if DB fails
+//            fileStorageService.delete("travel-documents", newFilePath);
+//            throw e;
+//        }
+//
+//        // 8️⃣ Delete old file safely
+//        if (oldFilePath != null) {
+//            try {
+//                fileStorageService.delete("travel-documents", oldFilePath);
+//            } catch (Exception ex) {
+//                log.warn("Failed to delete old travel document {}", oldFilePath, ex);
+//            }
+//        }
+//
+//        // (optional)
+//        if (dto.getDocumentTypeId() != null) {
+//            DocumentType documentType = documentTypeRepository.findById(dto.getDocumentTypeId())
+//                    .orElseThrow(() -> new ResourceNotFoundException("Document type not found"));
+//
+//            travelDocument.setDocumentType(documentType);
+//        }
+//    }
+
+
+    public void validateRoleBeforeDeletion(User user, TravelDocument travelDocument) {
+
+        boolean isHr = user.getRoles().stream()
+                .anyMatch(role -> ERole.ROLE_HR.equals(role.getName()));
+
+        boolean isEmployee = user.getRoles().stream()
+                .anyMatch(role -> ERole.ROLE_EMPLOYEE.equals(role.getName()));
+
+        if (!isHr && !isEmployee) {
+            throw new AccessDeniedException("You are not allowed to perform this action.");
+        }
+
+        EOwnerType ownerType = travelDocument.getOwnerType();
+
+        if (isHr) {
+            if (ownerType == EOwnerType.EMPLOYEE) {
+                throw new AccessDeniedException("HR cannot delete employee documents.");
+            }
+            return;
+        }
+
+        if (isEmployee) {
+            if (ownerType == EOwnerType.HR) {
+                throw new AccessDeniedException("Employees cannot delete HR documents.");
+            }
+
+            if (user.getEmployee() == null || travelDocument.getEmployee() == null ||
+                    !user.getEmployee().getId().equals(travelDocument.getEmployee().getId())) {
+                throw new AccessDeniedException("You can only delete your own documents.");
+            }
+        }
+    }
+//    public void validateRoleBeforeDeletion(User user, TravelDocument travelDocument) {
+//
+//        boolean isHr = user.getRoles().stream()
+//                .anyMatch(role -> ERole.ROLE_HR.equals(role.getName()));
+//
+//        boolean isEmployee = user.getRoles().stream()
+//                .anyMatch(role -> ERole.ROLE_EMPLOYEE.equals(role.getName()));
+//
+//        if (!isHr && !isEmployee) {
+//            throw new AccessDeniedException("You are not allowed to perform this action.");
+//        }
+//
+//        EOwnerType ownerType = travelDocument.getOwnerType();
+//
+//        if (isHr && ownerType == EOwnerType.EMPLOYEE) {
+//            throw new AccessDeniedException("HR cannot delete employee documents.");
+//        }
+//
+//        if (isEmployee) {
+//            if (ownerType == EOwnerType.HR) {
+//                throw new AccessDeniedException("Employees cannot delete HR documents.");
+//            }
+//
+//            if (user.getEmployee() == null || travelDocument.getEmployee() == null ||
+//                    !user.getEmployee().getId().equals(travelDocument.getEmployee().getId())) {
+//                throw new AccessDeniedException("You can only delete your own documents.");
+//            }
+//        }
+//    }
+
     //Hr can delete common docs
     //Employee can delete only his docs
-    public void validateRoleBeforeDeletion(User user, TravelDocument travelDocument){
-        boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
-        boolean isEmployee = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_EMPLOYEE);
-        EOwnerType ownerType = travelDocument.getOwnerType();
-        if(isHr){
-            if(ownerType == EOwnerType.EMPLOYEE){
-                throw new AccessDeniedException("You are not allowed to perform this action.");
-            }
-        }
-        if(isEmployee){
-            if(ownerType == EOwnerType.HR){
-                throw new AccessDeniedException("You are not allowed to perform this action.");
-            }
-            if(!user.getEmployee().getId().equals(travelDocument.getEmployee().getId())) {
-                throw new AccessDeniedException("You are not allowed to perform this action.");
-            }
-
-        }
-
-    }
+//    public void validateRoleBeforeDeletion(User user, TravelDocument travelDocument){
+//        boolean isHr = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_HR);
+//        boolean isEmployee = user.getRoles().stream().anyMatch(role -> role.getName()== ERole.ROLE_EMPLOYEE);
+//        EOwnerType ownerType = travelDocument.getOwnerType();
+//        if(isHr){
+//            if(ownerType == EOwnerType.EMPLOYEE){
+//                throw new AccessDeniedException("You are not allowed to perform this action.");
+//            }
+//        }
+//        if(isEmployee){
+//            if(ownerType == EOwnerType.HR){
+//                throw new AccessDeniedException("You are not allowed to perform this action.");
+//            }
+//            if(!user.getEmployee().getId().equals(travelDocument.getEmployee().getId())) {
+//                throw new AccessDeniedException("You are not allowed to perform this action.");
+//            }
+//
+//        }
+//
+//    }
 
     public void validateDeletionTime(TravelPlan travelPlan){
         LocalDate now = LocalDate.now();
         LocalDate startDate = travelPlan.getStartDate();
 
-        if(now.isBefore(startDate)){
+        if(!now.isBefore(startDate)){
             throw new IllegalStateException("Document cannot be deleted because travel plan has already been started.");
         }
 

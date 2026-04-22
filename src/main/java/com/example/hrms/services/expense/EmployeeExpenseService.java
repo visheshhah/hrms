@@ -11,13 +11,14 @@ import com.example.hrms.exceptions.ResourceNotFoundException;
 import com.example.hrms.repositories.*;
 import com.example.hrms.services.files.FileStorageService;
 import com.example.hrms.services.notification.NotificationService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class EmployeeExpenseService {
     private final ExpenseRepository expenseRepository;
     private final CategoryTypeRepository categoryTypeRepository;
@@ -74,7 +76,13 @@ public class EmployeeExpenseService {
         User uploader = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
         Employee employee = uploader.getEmployee();
         List<Expense> expenses = expenseRepository.findByTravelPlanIdAndEmployeeId(travelPlanId, employee.getId());
-
+//        return expenses.stream()
+//                .map(expense -> {
+//                    EmployeeExpenseResponseDto employeeExpenseResponseDto = new EmployeeExpenseResponseDto();
+//                    employeeExpenseResponseDto.setId(expense.getId());
+//                    employeeExpenseResponseDto.setTravelPlanId(travelPlanId);
+//                    employeeExpenseResponseDto.set
+//                })
         return expenses.stream()
                 .map(this::mapToDto)
                 .toList();
@@ -261,23 +269,178 @@ public class EmployeeExpenseService {
 
     }
 
-    public void deleteExpense(Long expenseId){
-        Expense expense = expenseRepository.findById(expenseId).orElseThrow(() -> new ResourceNotFoundException("EXPENSE NOT FOUND"));
-        if(!expense.getStatus().equals(ExpenseStatus.DRAFT)){
-            throw new IllegalStateException("Cannot delete expense");
+//    public void deleteExpense(Long expenseId){
+//        Expense expense = expenseRepository.findById(expenseId).orElseThrow(() -> new ResourceNotFoundException("EXPENSE NOT FOUND"));
+////        if(!expense.getStatus().equals(ExpenseStatus.DRAFT)){
+////            throw new IllegalStateException("Cannot delete expense");
+////        }
+//        validateExpenseStatus(expense);
+//
+//        //I have to delete expense record and proof associated with the record
+//        //currently i have a list of proof which i added for future but currently
+//        //there will be only one expense in the proofs
+//        ExpenseProof expenseProof = expense.getProofs().get(0);
+//        fileStorageService.delete("expense-proofs", expenseProof.getFilePath());
+//        expenseProffRepository.delete(expenseProof);
+//        expenseRepository.delete(expense);
+//    }
+
+@Transactional
+public void deleteExpense(Long expenseId, Long userId) {
+
+    User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+    Expense expense = expenseRepository.findById(expenseId)
+            .orElseThrow(() -> new ResourceNotFoundException("EXPENSE NOT FOUND"));
+    validateExpenseOwner(expense, user.getEmployee());
+
+    validateDeletionTime(expense);
+    validateExpenseStatus(expense);
+
+    List<ExpenseProof> proofs = expense.getProofs();
+
+    if (proofs != null && !proofs.isEmpty()) {
+        for (ExpenseProof proof : proofs) {
+            try {
+                fileStorageService.delete("expense-proofs", proof.getFilePath());
+            } catch (Exception e) {
+                log.warn("Failed to delete file: " + proof.getFilePath());
+            }
+            expenseProffRepository.deleteAll(proofs);
+        }
+    }
+
+    expenseRepository.delete(expense);
+}
+
+    @Transactional
+    public void updateExpense(
+            Long expenseId,
+            SubmitExpenseDto dto,
+            Long userId,
+            MultipartFile file
+    ) {
+
+        // 1️⃣ Fetch expense
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new ResourceNotFoundException("EXPENSE NOT FOUND"));
+
+        // 2️⃣ Validate user
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("NO USER FOUND"));
+
+        Employee employee = user.getEmployee();
+        validateExpenseOwner(expense, user.getEmployee());
+
+        // 3️⃣ Validate ownership / participant
+        validateParticipant(expense.getTravelPlan().getId(), employee.getId());
+
+        // 4️⃣ Validate business rules
+        validateDeletionTime(expense); // reuse
+        validateExpenseStatus(expense);
+
+        // 5️⃣ Fetch category
+        CategoryType categoryType = categoryTypeRepository.findById(dto.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("NO CATEGORY FOUND"));
+
+        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Invalid amount");
         }
 
-        //I have to delete expense record and proof associated with the record
-        //currently i have a list of proof which i added for future but currently
-        //there will be only one expense in the proofs
-        ExpenseProof expenseProof = expense.getProofs().get(0);
-        fileStorageService.delete("expense-proofs", expenseProof.getFilePath());
-        expenseProffRepository.delete(expenseProof);
-        expenseRepository.delete(expense);
+        if (dto.getDescription() == null || dto.getDescription().trim().isEmpty()) {
+            throw new IllegalArgumentException("Description required");
+        }
+
+        // 6️⃣ Update basic fields
+        expense.setAmount(dto.getAmount());
+        expense.setDescription(dto.getDescription());
+        expense.setCategory(categoryType);
+
+        // 7️⃣ Handle file (optional)
+        if (file != null && !file.isEmpty()) {
+
+            DocumentType receiptType = documentTypeRepository.findByCode("RECEIPT")
+                    .orElseThrow(() -> new ResourceNotFoundException("Receipt document type missing"));
+
+            validateFileFormat(file, receiptType);
+
+            // get existing proof (assuming one)
+            ExpenseProof proof = expense.getProofs().stream()
+                    .findFirst()
+                    .orElse(null);
+
+            String newFilePath = fileStorageService.store(file, "expense-proofs");
+
+            try {
+                if (proof != null) {
+
+                    String oldFilePath = proof.getFilePath();
+
+                    proof.setFileName(file.getOriginalFilename());
+                    proof.setFilePath(newFilePath);
+                    proof.setUploadedAt(Instant.now());
+                    proof.setDocumentType(receiptType);
+
+                    expenseProffRepository.save(proof);
+
+                    // delete old file
+                    if (oldFilePath != null) {
+                        try {
+                            fileStorageService.delete("expense-proofs", oldFilePath);
+                        } catch (Exception ex) {
+                            log.warn("Failed to delete old file: {}", oldFilePath, ex);
+                        }
+                    }
+
+                } else {
+                    // no existing proof → create new
+                    ExpenseProof newProof = new ExpenseProof();
+                    newProof.setExpense(expense);
+                    newProof.setFileName(file.getOriginalFilename());
+                    newProof.setFilePath(newFilePath);
+                    newProof.setUploadedAt(Instant.now());
+                    newProof.setDocumentType(receiptType);
+
+                    expenseProffRepository.save(newProof);
+                }
+
+            } catch (Exception e) {
+                fileStorageService.delete("expense-proofs", newFilePath);
+                throw e;
+            }
+        }
+
+        // 8️⃣ Save expense
+        expenseRepository.save(expense);
     }
 
     public List<EmployeeExpenseResponseDto> findAllExpenseByStatus(Long employeeId, Long travelPlanId, String status) {
        return hrExpenseService.findAllExpenseByStatus(employeeId, travelPlanId, status);
+    }
+
+    private void validateDeletionTime(Expense expense) {
+        LocalDate now = LocalDate.now();
+        LocalDate startDate = expense.getTravelPlan().getStartDate();
+        LocalDate endDate = expense.getTravelPlan().getEndDate().plusDays(10);
+
+        if (now.isBefore(startDate) || now.isAfter(endDate)) {
+            throw new AccessDeniedException(
+                    "You can only delete expenses between travel start date and 10 days after end date."
+            );
+        }
+    }
+
+    private void validateExpenseOwner(Expense expense, Employee employee) {
+        if(!expense.getEmployee().getId().equals(employee.getId())) {
+            throw new AccessDeniedException("You are not allowed to perform this operation");
+        }
+    }
+
+    private void validateExpenseStatus(Expense expense) {
+        ExpenseStatus status = expense.getStatus();
+
+        if (status == ExpenseStatus.REJECTED || status == ExpenseStatus.APPROVED) {
+            throw new IllegalStateException("Cannot delete expense");
+        }
     }
 }
 
